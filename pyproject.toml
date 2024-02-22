@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+[project]
+name = "dlip"
+version = "0.0.1"
+dependencies = [
+    "numpy"]
+
+description = "A small example package for Deep Learning in Practise"
+readme = "README.md"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+[tool.setuptools.packages.find]
+where = ["src"]
