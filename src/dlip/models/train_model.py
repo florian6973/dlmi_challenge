@@ -6,6 +6,7 @@ import mlflow
 import torch
 from dlip.data.data import load_dataset
 from dlip.models.models import LinearModel, save_model
+from dlip.data.patientDataset import PatientDataset
 from dlip.utils.mlflow import log_params_from_omegaconf_dict
 from hydra import utils
 from omegaconf import DictConfig
@@ -43,21 +44,23 @@ def train(num_epochs, batch_size, criterion, optimizer, model, dataset):
     return train_error
 
 
-@hydra.main(config_path="../conf", config_name="train_model")
-# This decorator add the parameter "cfg" to the launch function
-# the cfg object is an instance of the DictConfig class. You can think of it as a dictionnary , when dic['key'] is accessible as the( dict.key)
-# cfg is loaded from the yaml file at path ../conf/train_model.yaml
+@hydra.main(config_path="../conf", config_name="train_lenet", version_base="1.1")
 def launch(cfg: DictConfig):
     working_dir = os.getcwd()
-    train_set, val_set = load_dataset(utils.get_original_cwd() + cfg.exp.data_path)
-    model = LinearModel(16 * 16, 10)
+    train_set_path = utils.get_original_cwd() + cfg.exp.data_path
+    
+    complete_train_set = PatientDataset(train_set_path)
+    train_set, val_set = load_dataset(complete_train_set)
 
-    # Use mean squared loss function
-    criterion = torch.nn.MSELoss()
+    model     = hydra.utils.instantiate(cfg.model)
+    
+    criterion = hydra.utils.instantiate(cfg.criterion)
 
-    # Use SGD optimizer with a learning rate of 0.01
-    # It is initialized on our model
-    optimizer = torch.optim.SGD(model.parameters(), lr=cfg.train.lr)
+    optimizer = hydra.utils.instantiate(
+                    cfg.optimizer,
+                    *[model.parameters()], 
+                    **{"lr":cfg.train.lr}
+                )
 
     mlflow.set_tracking_uri("file://" + utils.get_original_cwd() + "/mlruns")
     mlflow.set_experiment(cfg.mlflow.runname)
@@ -67,10 +70,9 @@ def launch(cfg: DictConfig):
 
         train(cfg.train.num_epochs, cfg.train.batch_size, criterion, optimizer, model, train_set)
 
-    # Saving the checkpoint
     save_model(working_dir + "/checkpoint.pt", model)
-    logging.info(f"Checkpoint is saved at {working_dir}")
-    # You can save other artifacts from the training
+    logging.info(f"Checkpoint saved at {working_dir}")
+    
 
     # TODO Maybe improve the logging of the training loop ?
     # TODO Vizualisation methods ?

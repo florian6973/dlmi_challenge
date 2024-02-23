@@ -1,15 +1,26 @@
 
+model:
+  _target_: dlip.models.models.LeNet 
+
+criterion:
+  _target_: torch.nn.MSELoss
+
+optimizer:
+  _target_: torch.optim.SGD
+
 # Training parameters
 train: 
   lr: 1e-1
-  batch_size : 10
+  batch_size : 5
   num_epochs: 10
+
 # Experiment parameters
 exp: 
   name: "Classification"
   data_path: "/data/raw/" 
   checkpoint: "models/linear"
   seed: 0
+
 # mlflow parameters
 mlflow:
   runname: ${exp.name} # Take the value of exp.name

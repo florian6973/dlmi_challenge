@@ -20,6 +20,26 @@ class LinearModel(nn.Module):
         )  # Use softmax as the activation function for the last layer
         return outputs
 
+class LeNet(nn.Module):
+    def __init__(self):
+        super(LeNet, self).__init__()
+        self.conv1 = nn.Conv2d(3, 6, 5)  
+        self.pool  = nn.MaxPool2d(2, 2)  
+        self.conv2 = nn.Conv2d(6, 16, 5)  
+        self.fc1   = nn.Linear(16 * 56 * 56, 120)  
+        self.fc2   = nn.Linear(120, 84)  
+        self.fc3   = nn.Linear(84, 1) 
+
+    def forward(self, x):
+        x = self.pool(nn.functional.relu(self.conv1(x)))
+        x = self.pool(nn.functional.relu(self.conv2(x)))
+        x = x.view(-1, 16 * 5 * 5)
+        x = nn.functional.relu(self.fc1(x))
+        x = nn.functional.relu(self.fc2(x))
+        x = torch.sigmoid(self.fc3(x))  
+        return x
+
+
 
 def load_model(path_checkpoint, modelClass: torch.nn.Module, **kwargs):
     model = modelClass(**kwargs)
