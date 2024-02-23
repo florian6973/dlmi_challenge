@@ -3,6 +3,7 @@ import torchvision.io as io
 import pandas as pd
 import glob
 import os
+import numpy as np
 
 class PatientDataset(Dataset):
     def __init__(self, root_dir, split="train"):
@@ -25,7 +26,7 @@ class PatientDataset(Dataset):
             processed_images = []
             for path in image_paths:
                 image = io.read_image(path, io.ImageReadMode.RGB)
-                image = image.permute(1, 2, 0).numpy()
+                image = image.permute(1, 2, 0).float()
                 processed_images.append(image)
 
             return processed_images
@@ -37,7 +38,13 @@ class PatientDataset(Dataset):
         images = load_and_preprocess_images(image_paths)
         label  = self.data.loc[self.data['ID'] == cur_patient, 'LABEL'].values[0]
 
-        return images, label
+        random_index = np.random.randint(0, len(images))
+
+        # print(images[random_index].shape)
+        # print(images[random_index].dtype)
+        # print(label)
+
+        return images[random_index], int(label)
 
         
     def read_data_csv(self):

@@ -1,6 +1,5 @@
 import torch
 import torchvision
-from dlip.data.usps import download_usps
 from torch.utils.data import random_split
 from torchvision import transforms
 

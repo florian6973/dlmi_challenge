@@ -8,6 +8,8 @@ def main():
     
     annots = pd.read_csv(path / "clinical_annotation.csv")
     annots = annots.sort_values("ID")
+
+    print(annots.info())
     
     plt.scatter(annots["LYMPH_COUNT"], annots["LABEL"])
     print(np.count_nonzero(annots[annots["LABEL"] == -1]["LYMPH_COUNT"] > np.max(annots[annots["LABEL"] == 0]["LYMPH_COUNT"])))
