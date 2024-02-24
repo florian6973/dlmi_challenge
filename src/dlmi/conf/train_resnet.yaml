@@ -1,6 +1,6 @@
 
 model:
-  _target_: dlmi.models.models.LeNet 
+  _target_: dlmi.models.models.CustomResnet 
 
 criterion:
   _target_: torch.nn.CrossEntropyLoss
