@@ -4,6 +4,5 @@ jupyter
 matplotlib
 hydra-core
 setuptools
-mlflow==2.9.2
 scikit-learn # For fast dataset loading
 numpy
