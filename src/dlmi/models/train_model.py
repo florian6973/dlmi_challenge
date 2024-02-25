@@ -1,4 +1,5 @@
 import pytorch_lightning as pl
+import torch.nn as nn
 import torchmetrics
 import mlflow
 import torch
@@ -87,6 +88,40 @@ class BasicModel(pl.LightningModule):
         # optimizer = optim.Adam(self.parameters(), lr=1e-3)
         return self.optimizer
 
+class MILModel(pl.LightningModule):
+    def __init__(self, base_model, criterion, optimizer):
+        super().__init__()
+
+        self.base_model = base_model
+        self.criterion  = criterion
+        self.optimizer  = optimizer
+        self.base_model = base_model
+
+        self.fc = nn.Linear(base_model.resnet.fc.in_features, 2)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        features = self.base_model(x)
+        pooled_features = torch.mean(features, dim=0, keepdim=True)
+        logits = self.fc(pooled_features)
+        return self.sigmoid(logits)
+
+    def training_step(self, batch, batch_idx):
+        x, y = batch
+        y_hat = self(x)
+        loss = nn.BCELoss()(y_hat, y.unsqueeze(1).float())
+        self.log('train_loss', loss)
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        x, y = batch
+        y_hat = self(x)
+        loss = nn.BCELoss()(y_hat, y.unsqueeze(1).float())
+        self.log('val_loss', loss)
+
+    def configure_optimizers(self):
+        return self.optimizer
+    
 # def train(num_epochs, batch_size, criterion, optimizer, model, dataset):
 #     training_mo
     # train_error = []

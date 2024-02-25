@@ -9,13 +9,14 @@ import torch
 from dlmi.data.data import load_dataset
 from dlmi.models.models import save_model
 from dlmi.data.patientDataset import PatientDataset
+from dlmi.data.MILDataset import MILDataset
 from dlmi.utils.mlflow import log_params_from_omegaconf_dict
 from hydra import utils
 from omegaconf import DictConfig
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 
-from dlmi.models.train_model import BasicModel
+from dlmi.models.train_model import BasicModel, MILModel
 
 from tqdm import tqdm
 
@@ -32,7 +33,8 @@ def launch(cfg: DictConfig):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     
     print("Working dir: ", working_dir)
-    complete_train_set = PatientDataset(train_set_path)
+    # complete_train_set = PatientDataset(train_set_path)
+    complete_train_set = MILDataset(train_set_path)
     print("Train set loaded")
     train_set, val_set, mask_train = load_dataset(complete_train_set)
 
@@ -55,9 +57,10 @@ def launch(cfg: DictConfig):
 
         batch_size = cfg.train.batch_size
 
-        basic_model = BasicModel(model, criterion, optimizer)
+        # basic_model = BasicModel(model, criterion, optimizer)
+        basic_model   = MILModel(model, criterion, optimizer)
         train_dataset = DataLoader(train_set, batch_size, shuffle=True)
-        val_dataset = DataLoader(val_set, batch_size, shuffle=False)
+        val_dataset   = DataLoader(val_set,   batch_size, shuffle=False)
 
         trainer = pl.Trainer(
             max_epochs=cfg.train.num_epochs

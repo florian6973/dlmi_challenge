@@ -1,30 +1,40 @@
-from dlmi.utils.utils import read_data_csv, read_image
+from dlmi.utils.utils import read_data_csv, read_image, plot_tensor_as_image
 from dlmi.data.CustomDataset import CustomDataset
 from torch.utils.data import Dataset
-import torchvision.io as io
+import numpy as np
 import pandas as pd
+import torch
 import glob
 import os
-import numpy as np
 
-class PatientDataset(Dataset, CustomDataset):
+
+class MILDataset(Dataset, CustomDataset):
     def __init__(self, root_dir, split="train"):
-
         if split == "train":
             self.data_dir = os.path.join(root_dir, "trainset")
         else:
             self.data_dir = os.path.join(root_dir, "testset")
 
         self.split = split
-        self.patients = [p for p in os.listdir(self.data_dir) if os.path.isdir(os.path.join(self.data_dir, p))]
+        self.patients = [p for p in os.listdir(self.data_dir) \
+                         if os.path.isdir(os.path.join(self.data_dir, p))]
+
         self.data = read_data_csv(self.data_dir)
+        self.image_paths = glob.glob(self.data_dir + '/**/*.jpg')
 
-        self.image_paths = glob.glob(self.data_dir + '/**/*.jpg', recursive=True)#[:100]
-        self.images = {}
+    def __len__(self):
+        return len(self.patients)
 
+    def __getitem__(self, idx):
+        cur_patient          = self.patients[idx]
+        patient_images_paths = [p for p in self.image_paths if cur_patient in p]
+        patient_images       = [read_image(path) for path in patient_images_paths]
+        
+        label = self.data.loc[self.data['ID'] == cur_patient, 'LABEL'].values[0]
+
+        return torch.stack(patient_images), label
+    
     def get_balanced_mask(self, train_size, seed=0):
-        # np.random.seed(seed)
-        # mask = np.zeros(len(self.patients), dtype=bool)
         patients_labels = self.data.loc[self.data['ID'].isin(self.patients), 'LABEL']
 
         # sklearn balanced split
@@ -32,12 +42,9 @@ class PatientDataset(Dataset, CustomDataset):
 
         train_patients, _ = train_test_split(self.patients, stratify=patients_labels, train_size=train_size, random_state=seed)
         mask = np.array([p in train_patients for p in self.patients])
-        # print(mask)
-        # exit()
-
-        # mask[np.random.choice(len(self.patients), train_size, replace=False)] = True
+        
         return mask
-
+    
     def get_indices_from_patient_mask(self, mask):
         indices = []
         # print(self.patients)
@@ -45,7 +52,6 @@ class PatientDataset(Dataset, CustomDataset):
         for i, p in enumerate(self.image_paths):
             patient = os.path.basename(os.path.dirname(p))
             patients.append(patient)
-            # print(patient, np.where(np.array(self.patients) == patient)[0])
             if mask[np.where(np.array(self.patients) == patient)[0]] and patient in self.patients:
                 indices.append(i)
         # print(patients)
@@ -69,7 +75,6 @@ class PatientDataset(Dataset, CustomDataset):
             json.dump(counters, f)
         df = pd.DataFrame(columns=["ID", "LABEL"])
         for p in counters:
-            # df = df.append({"ID": p, "LABEL": np.argmax(counters[p])}, ignore_index=True)
             df.loc[len(df)] = [p, np.argmax(counters[p])]
         df.rename(columns={"ID":"Id", "LABEL":"Predicted"}).to_csv(f"submission_{dataset}.csv", index=False)
         if dataset != "test":
@@ -84,18 +89,18 @@ class PatientDataset(Dataset, CustomDataset):
             print(f"Balanced accuracy for {dataset}: {balanced_accuracy_score(df['LABEL_x'], df['LABEL_y'])}")
 
         return df
+    
+    
+if __name__ == "__main__":
 
-    def __len__(self):
-        return len(self.image_paths)
-        
-    def __getitem__(self, index):
-        cur_img_path = self.image_paths[index]
-        cur_patient  = os.path.basename(os.path.dirname(cur_img_path))
+    path = r"C:\Users\gaumu\GitHub\dlmi_challenge\data\raw"
 
-        if index not in self.images:
-            self.images[index] = read_image(cur_img_path)
+    data = MILDataset(path)
 
-        image = self.images[index]
-        label  = self.data.loc[self.data['ID'] == cur_patient, 'LABEL'].values[0]
+    img = iter(data).__next__()[0]
 
-        return image, label
+    import matplotlib.pyplot as plt
+
+    
+    plot_tensor_as_image(img[0])
+    plot_tensor_as_image(img[1])

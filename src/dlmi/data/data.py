@@ -1,11 +1,8 @@
-import torch
-import torchvision
-from torch.utils.data import random_split
-from torchvision import transforms
-import numpy as np
+from dlmi.data.CustomDataset import CustomDataset
 from torch.utils.data import Subset
+import torch
 
-def load_dataset(dataset, train_proportion=0.8, seed=0):
+def load_dataset(dataset: CustomDataset, train_proportion=0.8, seed=0):
     generator = torch.Generator()
     generator.manual_seed(seed)
 
