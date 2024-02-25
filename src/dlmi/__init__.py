@@ -36,8 +36,7 @@ def launch(cfg: DictConfig):
     print("Train set loaded")
     train_set, val_set, mask_train = load_dataset(complete_train_set)
 
-    model     = hydra.utils.instantiate(cfg.model,
-                                        **{"device": device})
+    model     = hydra.utils.instantiate(cfg.model)
     
     criterion = hydra.utils.instantiate(cfg.criterion)
 
