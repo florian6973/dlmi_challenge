@@ -69,7 +69,7 @@ class PatientDataset(Dataset):
         for p in counters:
             # df = df.append({"ID": p, "LABEL": np.argmax(counters[p])}, ignore_index=True)
             df.loc[len(df)] = [p, np.argmax(counters[p])]
-        df.rename_columns({"ID":"Id", "LABEL":"Predicted"}).to_csv(f"submission_{dataset}.csv", index=False)
+        df.rename(columns={"ID":"Id", "LABEL":"Predicted"}).to_csv(f"submission_{dataset}.csv", index=False)
         if dataset != "test":
             true_labels = self.data.loc[self.data['ID'].isin(df['ID'])]
 

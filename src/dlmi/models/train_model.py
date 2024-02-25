@@ -1,30 +1,19 @@
-import logging
-import os
-
-import hydra
+import pytorch_lightning as pl
+import torchmetrics
 import mlflow
 import torch
-from dlmi.data.data import load_dataset
-from dlmi.models.models import LinearModel, save_model
-from dlmi.data.patientDataset import PatientDataset
-from dlmi.utils.mlflow import log_params_from_omegaconf_dict
-from hydra import utils
-from omegaconf import DictConfig
-from torch.utils.data import DataLoader
-import pytorch_lightning as pl
 
-import torchmetrics
 
 class BasicModel(pl.LightningModule):
     def __init__(self, model, criterion, optimizer):
         super().__init__()
-        self.model = model
+        self.model     = model
         self.criterion = criterion
         self.optimizer = optimizer
         self.train_steps_output = []
-        self.train_acc_output = []
-        self.val_steps_output = []
-        self.val_acc_output = []
+        self.train_acc_output   = []
+        self.val_steps_output   = []
+        self.val_acc_output     = []
 
     def compute_forward_loss(self, images, labels):
         images = images.to("cuda")
@@ -64,7 +53,7 @@ class BasicModel(pl.LightningModule):
         return loss
 
     def on_train_epoch_end(self):
-        y_pre_all = torch.cat([x[0] for x in self.train_acc_output])
+        y_pre_all  = torch.cat([x[0] for x in self.train_acc_output])
         labels_all = torch.cat([x[1] for x in self.train_acc_output])
         acc = torchmetrics.functional.classification.accuracy(
             y_pre_all, labels_all, task='multiclass', num_classes=2, average='macro'

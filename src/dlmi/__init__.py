@@ -7,7 +7,7 @@ import hydra
 import mlflow
 import torch
 from dlmi.data.data import load_dataset
-from dlmi.models.models import LinearModel, save_model
+from dlmi.models.models import save_model
 from dlmi.data.patientDataset import PatientDataset
 from dlmi.utils.mlflow import log_params_from_omegaconf_dict
 from hydra import utils
@@ -28,13 +28,16 @@ def run_local_mlflow():
 def launch(cfg: DictConfig):
     working_dir = os.getcwd()
     train_set_path = utils.get_original_cwd() + cfg.exp.data_path
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     
     print("Working dir: ", working_dir)
     complete_train_set = PatientDataset(train_set_path)
     print("Train set loaded")
     train_set, val_set, mask_train = load_dataset(complete_train_set)
 
-    model     = hydra.utils.instantiate(cfg.model)
+    model     = hydra.utils.instantiate(cfg.model,
+                                        **{"device": device})
     
     criterion = hydra.utils.instantiate(cfg.criterion)
 
@@ -67,19 +70,19 @@ def launch(cfg: DictConfig):
     save_model(working_dir + "/checkpoint.pt", model)
     logging.info(f"Checkpoint saved at {working_dir}")
 
-    model = model.to("cuda")
+    model = model.to(device)
     complete_test_set = PatientDataset(train_set_path, split="test")
     test_dataset = DataLoader(complete_test_set, batch_size, shuffle=False)
-    run_infer(test_dataset, complete_test_set, model, "test", None)
+    run_infer(test_dataset, complete_test_set, model, "test", device, None)
 
-    run_infer(val_dataset, complete_train_set, model, "val", (~mask_train))
+    run_infer(val_dataset, complete_train_set, model, "val", device, (~mask_train))
     
 
-def run_infer(dataset, main_dataset, model, name, mask=None):
+def run_infer(dataset, main_dataset, model, name, device, mask=None):
     preds = []
     for batch in tqdm(dataset, desc=f"Predicting {name} set"):
         images, labels = batch
-        images = images.to("cuda")
+        images = images.to(device)
         y_pre = model(images)
         # print(y_pre)
         # print(labels)
