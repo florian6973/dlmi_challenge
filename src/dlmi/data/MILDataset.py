@@ -31,8 +31,9 @@ class MILDataset(Dataset, CustomDataset):
         patient_images       = [read_image(path) for path in patient_images_paths]
         
         label = self.data.loc[self.data['ID'] == cur_patient, 'LABEL'].values[0]
+        age_count_features = self.data.loc[self.data['ID'] == cur_patient, ['GENDER', 'DOB', 'LYMPH_COUNT']].values[0]
 
-        return torch.stack(patient_images), label
+        return torch.stack(patient_images), age_count_features, label
     
     def get_balanced_mask(self, train_size, seed=0):
         patients_labels = self.data.loc[self.data['ID'].isin(self.patients), 'LABEL']
@@ -42,12 +43,15 @@ class MILDataset(Dataset, CustomDataset):
 
         train_patients, _ = train_test_split(self.patients, stratify=patients_labels, train_size=train_size, random_state=seed)
         mask = np.array([p in train_patients for p in self.patients])
+
+        # check if the mask is balanced
+        print(f"Train set balanced: {np.mean(patients_labels[mask])}")
+        print(f"Test set balanced: {np.mean(patients_labels[~mask])}")
         
         return mask
     
     def get_indices_from_patient_mask(self, mask):
         indices = []
-        # print(self.patients)
         patients = []
         for i, p in enumerate(self.image_paths):
             patient = os.path.basename(os.path.dirname(p))
