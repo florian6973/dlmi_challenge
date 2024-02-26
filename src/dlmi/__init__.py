@@ -25,7 +25,7 @@ def run_local_mlflow():
 
     
 
-@hydra.main(config_path="dlmi/conf", config_name="train_resnet", version_base="1.1")
+@hydra.main(config_path="dlmi/conf", config_name="train_mlp", version_base="1.1")
 def launch(cfg: DictConfig):
     working_dir = os.getcwd()
     train_set_path = utils.get_original_cwd() + cfg.exp.data_path
@@ -38,15 +38,7 @@ def launch(cfg: DictConfig):
     print("Train set loaded")
     train_set, val_set, mask_train = load_dataset(complete_train_set)
 
-    model     = hydra.utils.instantiate(cfg.model)
-    
-    criterion = hydra.utils.instantiate(cfg.criterion)
-
-    optimizer = hydra.utils.instantiate(
-                    cfg.optimizer,
-                    *[model.parameters()], 
-                    **{"lr":cfg.train.lr}
-                )
+    model = hydra.utils.instantiate(cfg.model, cfg)
 
     # mlflow.set_tracking_uri("file://" + utils.get_original_cwd() + "/mlruns")
     mlflow.set_tracking_uri(uri="http://127.0.0.1:5001")
@@ -58,14 +50,15 @@ def launch(cfg: DictConfig):
         batch_size = cfg.train.batch_size
 
         # basic_model = BasicModel(model, criterion, optimizer)
-        basic_model   = MILModel(model, criterion, optimizer)
-        train_dataset = DataLoader(train_set, batch_size, shuffle=True)
-        val_dataset   = DataLoader(val_set,   batch_size, shuffle=False)
+        # basic_model   = MILModel(model, criterion, optimizer)
+        train_dataset = DataLoader(train_set, batch_size, shuffle=True, num_workers=0)
+        val_dataset   = DataLoader(val_set,   batch_size, shuffle=False, num_workers=0)
 
         trainer = pl.Trainer(
-            max_epochs=cfg.train.num_epochs
+            max_epochs=cfg.train.num_epochs,
+            accelerator="gpu"
         )
-        trainer.fit(basic_model, train_dataset, val_dataset)
+        trainer.fit(model, train_dataset, val_dataset)
 
         # train(cfg.train.num_epochs, cfg.train.batch_size, criterion, optimizer, model, train_set)
 
@@ -73,7 +66,7 @@ def launch(cfg: DictConfig):
     logging.info(f"Checkpoint saved at {working_dir}")
 
     model = model.to(device)
-    complete_test_set = PatientDataset(train_set_path, split="test")
+    complete_test_set = MILDataset(train_set_path, split="test")
     test_dataset = DataLoader(complete_test_set, batch_size, shuffle=False)
     run_infer(test_dataset, complete_test_set, model, "test", device, None)
 
@@ -84,8 +77,9 @@ def run_infer(dataset, main_dataset, model, name, device, mask=None):
     preds = []
     for batch in tqdm(dataset, desc=f"Predicting {name} set"):
         images, labels = batch
-        images = images.to(device)
-        y_pre = model(images)
+        images[1] = images[1].to(device)
+        # print(images[1].shape)
+        y_pre = model(images[1])
         # print(y_pre)
         # print(labels)
         selected_class = torch.argmax(y_pre, dim=1)

@@ -3,19 +3,20 @@ import torch.nn as nn
 import torchmetrics
 import mlflow
 import torch
-
+import hydra.utils
 
 class MLPModel(pl.LightningModule):
-    def __init__(self, cfg, criterion, optimizer):
+    def __init__(self, cfg):
         super().__init__()
         self.cfg = cfg
         self.model     = nn.Sequential(
-            nn.Linear(3*224*224, 100),
+            nn.Linear(3, 10),
             nn.ReLU(),
-            nn.Linear(100, 2),
-            nn.Softmax(dim=1)
+            nn.Linear(10, 2),
+            nn.LogSoftmax(dim=1)
         )
-        self.criterion = criterion
+        self.criterion = hydra.utils.instantiate(cfg.criterion)
+        self.cfg = cfg
 
         self.train_steps_output = []
         self.train_acc_output   = []
@@ -23,27 +24,35 @@ class MLPModel(pl.LightningModule):
         self.val_acc_output     = []
 
     def forward(self, x):
+        # print(x.shape)
+        # print(x)
         return self.model(x)
 
-    def training_step(self, batch, batch_idx):
-        _, mlp_features, labels = batch
+    def training_step(self, batch, batch_idx):     
+        all_features, labels = batch
+        mlp_features = all_features[1]
         preds = self.forward(mlp_features)
+        # print(preds.shape)
+        # print(preds)
         loss = self.criterion(preds, labels)
 
         self.train_steps_output.append(loss.item())
+        # print(loss)
         self.train_acc_output.append(
-            [y_pre, labels]
+            [preds, labels]
         )
         return loss
 
     def validation_step(self, batch, batch_idx):        
-        _, mlp_features, labels = batch
+        all_features, labels = batch
+        mlp_features = all_features[1]
         preds = self.forward(mlp_features)
         loss = self.criterion(preds, labels)
         
         self.val_acc_output.append(
             [preds, labels]
         )
+        # print(loss)
 
         self.val_steps_output.append(loss.item())
         return loss
@@ -84,5 +93,12 @@ class MLPModel(pl.LightningModule):
         self.val_steps_output = []
 
     def configure_optimizers(self):
-        optimizer = optim.Adam(self.parameters(), lr=1e-3)
+        # optimizer = optim.Adam(self.parameters(), lr=1e-3)
+        # return optimizer
+        # return self.optimizer
+        optimizer = hydra.utils.instantiate(
+                    self.cfg.optimizer,
+                    *[self.model.parameters()], 
+                    **{"lr":self.cfg.train.lr}
+                )
         return optimizer
