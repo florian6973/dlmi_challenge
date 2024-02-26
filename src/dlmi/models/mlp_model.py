@@ -99,6 +99,6 @@ class MLPModel(pl.LightningModule):
         optimizer = hydra.utils.instantiate(
                     self.cfg.optimizer,
                     *[self.model.parameters()], 
-                    **{"lr":self.cfg.train.lr}
+                    **{"lr":self.cfg.train.lr, "weight_decay":self.cfg.train.weight_decay}
                 )
         return optimizer

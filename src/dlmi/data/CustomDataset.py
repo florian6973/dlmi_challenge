@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 class CustomDataset(ABC):
 
     @abstractmethod
-    def get_balanced_mask(self, train_size, seed=0):
+    def get_balanced_mask(self, train_size):
         pass
     
     @abstractmethod

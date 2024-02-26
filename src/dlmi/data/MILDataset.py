@@ -57,13 +57,13 @@ class MILDataset(Dataset, CustomDataset):
         # print(age_count_features)
         return [features, age_count_features], label
     
-    def get_balanced_mask(self, train_size, seed=0):
+    def get_balanced_mask(self, train_size):
         patients_labels = self.data.loc[self.data['ID'].isin(self.patients), 'LABEL']
 
         # sklearn balanced split
         from sklearn.model_selection import train_test_split
 
-        train_patients, _ = train_test_split(self.patients, stratify=patients_labels, train_size=train_size, random_state=seed)
+        train_patients, _ = train_test_split(self.patients, stratify=patients_labels, train_size=train_size)
         mask = np.array([p in train_patients for p in self.patients])
 
         # print(np.count_nonzero(mask), np.count_nonzero(~mask))

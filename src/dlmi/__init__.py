@@ -3,6 +3,8 @@ import subprocess
 import logging
 import os
 
+import numpy as np
+
 import hydra
 import mlflow
 import torch
@@ -31,6 +33,9 @@ def launch(cfg: DictConfig):
     train_set_path = utils.get_original_cwd() + cfg.exp.data_path
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    torch.manual_seed(cfg.exp.seed)
+    np.random.seed(cfg.exp.seed)
     
     print("Working dir: ", working_dir)
     # complete_train_set = PatientDataset(train_set_path)

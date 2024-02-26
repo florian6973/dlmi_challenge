@@ -11,7 +11,7 @@ optimizer:
 # Training parameters
 train: 
   lr: 1e-3
-  batch_size : 50
+  batch_size : 10
   num_epochs: 3
 
 # Experiment parameters
