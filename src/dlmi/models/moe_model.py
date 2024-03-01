@@ -13,22 +13,22 @@ class MOEModel(pl.LightningModule):
         super().__init__()
         self.cfg = cfg
 
-        self.model = torchvision.models.resnet18(pretrained=True)
-        self.model.fc = nn.Identity()
+        # self.model = torchvision.models.resnet18()
+        # self.model.fc = nn.Identity()
 
-        # self.model = nn.Sequential(
-        #     nn.Conv2d(3, 6, 5, padding=1),
-        #     nn.MaxPool2d(2, 2, padding=1),
-        #     nn.Conv2d(6, 16, 5, padding=1),
-        #     nn.MaxPool2d(2, 2, padding=1),
-        #     nn.Flatten(),
-        #     nn.Linear(16 * 224//4 * 224//4, 512),
-        #     nn.ReLU(),
-        #     # nn.Linear(120, 84),
-        #     # nn.ReLU(),
-        #     # nn.Linear(84, 2),
-        #     # nn.LogSoftmax(dim=1)
-        # )
+        self.model = nn.Sequential(
+            nn.Conv2d(3, 6, 5, padding=1),
+            nn.MaxPool2d(2, 2, padding=1),
+            nn.Conv2d(6, 16, 5, padding=1),
+            nn.MaxPool2d(2, 2, padding=1),
+            nn.Flatten(),
+            nn.Linear(16 * 224//4 * 224//4, 512),
+            nn.ReLU(),
+            # nn.Linear(120, 84),
+            # nn.ReLU(),
+            # nn.Linear(84, 2),
+            # nn.LogSoftmax(dim=1)
+        )
 
         self.final = nn.Sequential(nn.Linear(512, 2), nn.LogSoftmax(dim=1))
         self.mlp     = nn.Sequential(
@@ -59,6 +59,15 @@ class MOEModel(pl.LightningModule):
 
         #     transforms.Normalize([209.15147887/255,  178.78958125/255,  179.65400146/255], [1.,1.,1.])
         # ])
+
+    def on_train_epoch_start(self) -> None:
+        if self.current_epoch == self.trainer.max_epochs - 1:
+            pass
+            # Workaround to always save the last epoch until the bug is fixed in lightning (https://github.com/Lightning-AI/lightning/issues/4539)
+            # self.trainer.check_val_every_n_epoch = 1
+
+            # Disable backward pass for SWA until the bug is fixed in lightning (https://github.com/Lightning-AI/lightning/issues/17245)
+            # self.automatic_optimization = False
 
     def forward(self, x):
         # print(x.shape)
