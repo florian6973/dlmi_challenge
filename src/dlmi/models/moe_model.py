@@ -12,9 +12,24 @@ class MOEModel(pl.LightningModule):
     def __init__(self, cfg):
         super().__init__()
         self.cfg = cfg
-        self.model = torchvision.models.resnet18()
-        # self.model.fc = nn.Linear(512, 2)
+
+        self.model = torchvision.models.resnet18(pretrained=True)
         self.model.fc = nn.Identity()
+
+        # self.model = nn.Sequential(
+        #     nn.Conv2d(3, 6, 5, padding=1),
+        #     nn.MaxPool2d(2, 2, padding=1),
+        #     nn.Conv2d(6, 16, 5, padding=1),
+        #     nn.MaxPool2d(2, 2, padding=1),
+        #     nn.Flatten(),
+        #     nn.Linear(16 * 224//4 * 224//4, 512),
+        #     nn.ReLU(),
+        #     # nn.Linear(120, 84),
+        #     # nn.ReLU(),
+        #     # nn.Linear(84, 2),
+        #     # nn.LogSoftmax(dim=1)
+        # )
+
         self.final = nn.Sequential(nn.Linear(512, 2), nn.LogSoftmax(dim=1))
         self.mlp     = nn.Sequential(
             nn.Linear(5, 10),
@@ -88,6 +103,7 @@ class MOEModel(pl.LightningModule):
             # Apply the transform to an image
         features = cnn_features[mask]
         # features = self.transform_normalize(features)
+
         if augment:
             features = self.transform(features)
 
@@ -188,6 +204,6 @@ class MOEModel(pl.LightningModule):
         optimizer = hydra.utils.instantiate(
                     self.cfg.optimizer,
                     *[self.model.parameters()], 
-                    **{"lr":self.cfg.train.lr, "weight_decay":self.cfg.train.weight_decay, "momentum":self.cfg.train.momentum}
+                    **{"lr":self.cfg.train.lr, "weight_decay":self.cfg.train.weight_decay, "betas":(self.cfg.train.beta1, self.cfg.train.beta2)}
                 )
         return optimizer

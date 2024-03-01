@@ -12,9 +12,10 @@ optimizer:
 train: 
   lr: 1e-2
   batch_size : 5
-  num_epochs: 10
-  weight_decay: 0.00
-  momentum: 0.9
+  num_epochs: 1
+  weight_decay: 0 #0.0005
+  beta1: 0.9
+  beta2: 0.999
 
 # Experiment parameters
 exp: 
@@ -22,6 +23,7 @@ exp:
   data_path: "/data/raw/" 
   checkpoint: "models/linear"
   seed: 29
+  tune: true
 
 # mlflow parameters
 mlflow:
