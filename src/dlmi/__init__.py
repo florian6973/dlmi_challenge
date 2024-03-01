@@ -18,6 +18,10 @@ from omegaconf import DictConfig
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 
+from pytorch_lightning.callbacks import ModelCheckpoint
+
+import random
+
 from dlmi.models.train_model import BasicModel, MILModel
 
 from tqdm import tqdm
@@ -36,6 +40,7 @@ def launch(cfg: DictConfig):
 
     torch.manual_seed(cfg.exp.seed)
     np.random.seed(cfg.exp.seed)
+    random.seed(cfg.exp.seed)
     
     print("Working dir: ", working_dir)
     # complete_train_set = PatientDataset(train_set_path)
@@ -59,40 +64,56 @@ def launch(cfg: DictConfig):
         train_dataset = DataLoader(train_set, batch_size, shuffle=True, num_workers=0)
         val_dataset   = DataLoader(val_set,   batch_size, shuffle=False, num_workers=0)
 
+        checkpoint_callback = ModelCheckpoint(monitor="val_negacc")
+
         trainer = pl.Trainer(
             max_epochs=cfg.train.num_epochs,
-            accelerator="gpu"
+            accelerator="gpu",
+            precision=16,
+            log_every_n_steps=10,
+            callbacks=[checkpoint_callback]
         )
         trainer.fit(model, train_dataset, val_dataset)
 
+        model.load_state_dict(torch.load(checkpoint_callback.best_model_path)["state_dict"])
+
         # train(cfg.train.num_epochs, cfg.train.batch_size, criterion, optimizer, model, train_set)
 
-    save_model(working_dir + "/checkpoint.pt", model)
-    logging.info(f"Checkpoint saved at {working_dir}")
+    # save_model(working_dir + "/checkpoint.pt", model)
+    # logging.info(f"Checkpoint saved at {working_dir}")
 
+    import gc
+    gc.collect()
     model = model.to(device)
     complete_test_set = MILDataset(train_set_path, split="test")
-    test_dataset = DataLoader(complete_test_set, batch_size, shuffle=False)
+    test_dataset = DataLoader(complete_test_set, 1, shuffle=False)
+    # device = "cpu"
     run_infer(test_dataset, complete_test_set, model, "test", device, None)
 
     run_infer(val_dataset, complete_train_set, model, "val", device, (~mask_train))
     
-
+# https://medium.com/@soumensardarintmain/manage-cuda-cores-ultimate-memory-management-strategy-with-pytorch-2bed30cab1#:~:text=The%20recommended%20way%20is%20to,first%20and%20then%20call%20torch.
 def run_infer(dataset, main_dataset, model, name, device, mask=None):
     preds = []
-    for batch in tqdm(dataset, desc=f"Predicting {name} set"):
-        images, labels = batch
-        images[1] = images[1].to(device)
-        # print(images[1].shape)
-        y_pre = model(images[1])
-        # print(y_pre)
-        # print(labels)
-        selected_class = torch.argmax(y_pre, dim=1)
-        # print(selected_class)
-        preds.append(selected_class)
-    
-    preds = torch.cat(preds)
-    main_dataset.get_patient_labels(preds, mask, name)
+    # model = model.to(device)
+    model.eval()
+    with torch.no_grad():
+        for batch in tqdm(dataset, desc=f"Predicting {name} set"):
+            torch.cuda.empty_cache()
+            images, labels = batch
+            # print(images[0].shape)
+            # images[1] = images[1].to(device)
+            # print(images[1].shape)
+            # y_pre = model(images[1])
+            y_pre = model.infer(images[0].unsqueeze(1).to(device), images[1].to(device), images[0].shape[0])
+            # print(y_pre)
+            # print(labels)
+            selected_class = torch.argmax(y_pre, dim=1)
+            # print(selected_class)
+            preds.append(selected_class)
+        
+        preds = torch.cat(preds)
+        main_dataset.get_patient_labels(preds, mask, name)
 
     
 

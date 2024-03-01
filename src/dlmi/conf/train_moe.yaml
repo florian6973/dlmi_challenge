@@ -10,17 +10,18 @@ optimizer:
 
 # Training parameters
 train: 
-  lr: 1e-3
+  lr: 1e-2
   batch_size : 5
-  num_epochs: 20
-  weight_decay: 0
+  num_epochs: 10
+  weight_decay: 0.00
+  momentum: 0.9
 
 # Experiment parameters
 exp: 
   name: "Classification"
   data_path: "/data/raw/" 
   checkpoint: "models/linear"
-  seed: 10
+  seed: 29
 
 # mlflow parameters
 mlflow:

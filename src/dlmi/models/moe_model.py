@@ -38,8 +38,12 @@ class MOEModel(pl.LightningModule):
         # Define the augmentation pipeline
         self.transform = transforms.Compose([
             transforms.RandomRotation(90),  # Rotate the image by a random angle up to 30 degrees
-            transforms.ColorJitter(brightness=0.3)  # Change the brightness by a random factor up to 0.3
+            transforms.ColorJitter(brightness=0.3) # Change the brightness by a random factor up to 0.3
         ])
+        # self.transform_normalize = transforms.Compose([
+
+        #     transforms.Normalize([209.15147887/255,  178.78958125/255,  179.65400146/255], [1.,1.,1.])
+        # ])
 
     def forward(self, x):
         # print(x.shape)
@@ -83,6 +87,7 @@ class MOEModel(pl.LightningModule):
 
             # Apply the transform to an image
         features = cnn_features[mask]
+        # features = self.transform_normalize(features)
         if augment:
             features = self.transform(features)
 
@@ -171,6 +176,7 @@ class MOEModel(pl.LightningModule):
         self.val_acc_output = []
 
         val_error = sum(self.val_steps_output) / len(self.val_steps_output)
+        self.log("val_negacc", -acc)
         mlflow.log_metric("val_error", val_error, step=self.current_epoch)
         print(f"Epoch {self.current_epoch} val_error: {val_error} - val_acc: {acc}")
         self.val_steps_output = []
@@ -182,6 +188,6 @@ class MOEModel(pl.LightningModule):
         optimizer = hydra.utils.instantiate(
                     self.cfg.optimizer,
                     *[self.model.parameters()], 
-                    **{"lr":self.cfg.train.lr, "weight_decay":self.cfg.train.weight_decay}
+                    **{"lr":self.cfg.train.lr, "weight_decay":self.cfg.train.weight_decay, "momentum":self.cfg.train.momentum}
                 )
         return optimizer
