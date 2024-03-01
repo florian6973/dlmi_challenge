@@ -93,7 +93,7 @@ def launch(cfg: DictConfig):
 
         # train(cfg.train.num_epochs, cfg.train.batch_size, criterion, optimizer, model, train_set)
 
-    if cfg.exp.tune:
+    if cfg.exp.tune.enabled:
         model = tune_cfg(cfg, train_set, val_set)
     else:
         model = train_dlmi(None, cfg, train_set, val_set)
@@ -114,6 +114,10 @@ def launch(cfg: DictConfig):
 
 def update_config(cfg, config):
     cfg.train.batch_size = config["batch_size"]
+    cfg.train.lr = config["lr"]
+    cfg.train.weight_decay = config["weight_decay"]
+    cfg.train.num_epochs = config["num_epochs"]
+    cfg.exp.seed = config["seed"]
     return cfg
 
 def train_dlmi(config, cfg, train_set, val_set):
@@ -159,8 +163,11 @@ def train_dlmi(config, cfg, train_set, val_set):
 def tune_cfg(cfg, train_set, val_set):
     config = {
         # "lr": tune.loguniform(1e-4, 1e-1),
-        "batch_size": tune.choice([2, 5]),
-        # "num_epochs": tune.choice([10, 20, 30]),
+        "batch_size": tune.choice([1, 5]),
+        "lr": tune.loguniform(1e-4, 1e-1),
+        "weight_decay": tune.loguniform(1e-4, 1e-1),
+        "num_epochs": tune.choice([10, 20, 30, 40]),
+        "seed": tune.choice([42, 43, 44, 45, 46, 47, 48, 49, 50]),
     }
 
     trainable = tune.with_parameters(
@@ -175,7 +182,7 @@ def tune_cfg(cfg, train_set, val_set):
         tune_config=tune.TuneConfig(
             metric="val_negacc",
             mode="min",
-            num_samples=2,
+            num_samples=cfg.exp.tune.num_samples,
         ),
         run_config=train.RunConfig(
             name="tune_dlmi",

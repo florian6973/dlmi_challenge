@@ -23,7 +23,9 @@ exp:
   data_path: "/data/raw/" 
   checkpoint: "models/linear"
   seed: 29
-  tune: true
+  tune:
+    enabled: true
+    num_samples: 20
 
 # mlflow parameters
 mlflow:
