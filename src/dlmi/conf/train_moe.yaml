@@ -1,0 +1,30 @@
+
+model:
+  _target_: dlmi.models.moe_model.MOEModel
+
+criterion:
+  _target_: torch.nn.CrossEntropyLoss
+
+optimizer:
+  _target_: torch.optim.Adam
+
+# Training parameters
+train: 
+  lr: 1e-3
+  batch_size : 5
+  num_epochs: 20
+  weight_decay: 0
+
+# Experiment parameters
+exp: 
+  name: "Classification"
+  data_path: "/data/raw/" 
+  checkpoint: "models/linear"
+  seed: 10
+
+# mlflow parameters
+mlflow:
+  runname: ${exp.name} # Take the value of exp.name
+
+job:
+    chdir: true

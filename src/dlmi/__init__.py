@@ -27,7 +27,7 @@ def run_local_mlflow():
 
     
 
-@hydra.main(config_path="dlmi/conf", config_name="train_mlp", version_base="1.1")
+@hydra.main(config_path="dlmi/conf", config_name="train_moe", version_base="1.1")
 def launch(cfg: DictConfig):
     working_dir = os.getcwd()
     train_set_path = utils.get_original_cwd() + cfg.exp.data_path
