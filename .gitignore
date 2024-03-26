@@ -157,3 +157,5 @@ data/raw/*
 *.jpg
 mlruns/*
 outputs/*
+
+__local__*

@@ -1,6 +1,6 @@
 import subprocess
 
-import logging
+import gc
 import os
 
 import numpy as np
@@ -13,6 +13,7 @@ from dlmi.models.models import save_model
 from dlmi.data.patientDataset import PatientDataset
 from dlmi.data.MILDataset import MILDataset
 from dlmi.utils.mlflow import log_params_from_omegaconf_dict
+
 from hydra import utils
 from omegaconf import DictConfig
 from torch.utils.data import DataLoader
@@ -47,9 +48,7 @@ def launch(cfg: DictConfig):
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    torch.manual_seed(cfg.exp.seed)
-    np.random.seed(cfg.exp.seed)
-    random.seed(cfg.exp.seed)
+    # set_seed(cfg.exp.seed)
     
     print("Working dir: ", working_dir)
     # complete_train_set = PatientDataset(train_set_path)
@@ -64,10 +63,6 @@ def launch(cfg: DictConfig):
     # start new run
     # with mlflow.start_run():
     #     log_params_from_omegaconf_dict(cfg) 
-
-    #     torch.manual_seed(cfg.exp.seed)
-    #     np.random.seed(cfg.exp.seed)
-    #     random.seed(cfg.exp.seed)
         
     #     model = hydra.utils.instantiate(cfg.model, cfg)
 
@@ -93,7 +88,8 @@ def launch(cfg: DictConfig):
 
         # train(cfg.train.num_epochs, cfg.train.batch_size, criterion, optimizer, model, train_set)
 
-    if cfg.exp.tune.enabled:
+
+    if "tune" in cfg.exp.keys() and cfg.exp.tune.enabled:
         model = tune_cfg(cfg, train_set, val_set)
     else:
         model = train_dlmi(None, cfg, train_set, val_set)
@@ -101,11 +97,10 @@ def launch(cfg: DictConfig):
     # save_model(working_dir + "/checkpoint.pt", model)
     # logging.info(f"Checkpoint saved at {working_dir}")
 
-    import gc
     gc.collect()
     model = model.to(device)
     complete_test_set = MILDataset(train_set_path, split="test")
-    test_dataset = DataLoader(complete_test_set, 1, shuffle=False)
+    test_dataset = DataLoader(complete_test_set, 1, shuffle=False, num_workers=0)
     # device = "cpu"
     run_infer(test_dataset, complete_test_set, model, "test", device, None)
 
@@ -129,9 +124,7 @@ def train_dlmi(config, cfg, train_set, val_set):
     with mlflow.start_run():
         log_params_from_omegaconf_dict(cfg) 
 
-        torch.manual_seed(cfg.exp.seed)
-        np.random.seed(cfg.exp.seed)
-        random.seed(cfg.exp.seed)        
+        pl.seed_everything(cfg.exp.seed, workers=True)    
 
         model = hydra.utils.instantiate(cfg.model, cfg)
 
@@ -150,7 +143,8 @@ def train_dlmi(config, cfg, train_set, val_set):
             accelerator="gpu",
             precision=16,
             log_every_n_steps=10,
-            callbacks=[checkpoint_callback, tune_callback]
+            callbacks=[checkpoint_callback, tune_callback],
+            deterministic=True
         )
         trainer.fit(model, train_dataset, val_dataset)
 

@@ -11,28 +11,51 @@ import torchvision.transforms as transforms
 class MOEModel(pl.LightningModule):
     def __init__(self, cfg):
         super().__init__()
+
+        self.automatic_optimization = False
+        
         self.cfg = cfg
 
-        # self.model = torchvision.models.resnet18()
-        # self.model.fc = nn.Identity()
+        self.cnn = torchvision.models.resnet34(weights="DEFAULT")
 
-        self.model = nn.Sequential(
-            nn.Conv2d(3, 6, 5, padding=1),
-            nn.MaxPool2d(2, 2, padding=1),
-            nn.Conv2d(6, 16, 5, padding=1),
-            nn.MaxPool2d(2, 2, padding=1),
-            nn.Flatten(),
-            nn.Linear(16 * 224//4 * 224//4, 512),
-            nn.ReLU(),
-            # nn.Linear(120, 84),
-            # nn.ReLU(),
-            # nn.Linear(84, 2),
-            # nn.LogSoftmax(dim=1)
+        if "freeze_cnn" in self.cfg.train.keys() and \
+           self.cfg.train.freeze_cnn:
+
+            for param in self.cnn.parameters():
+                param.requires_grad = False
+        
+        self.cnn.fc = nn.Sequential(
+            nn.Linear(self.cnn.fc.in_features, 2), 
+            nn.LogSoftmax(dim=1)
         )
 
-        self.final = nn.Sequential(nn.Linear(512, 2), nn.LogSoftmax(dim=1))
-        self.mlp     = nn.Sequential(
-            nn.Linear(5, 10),
+        # self.cnn.fc = nn.Linear(self.cnn.fc.in_features, 2)
+
+        for param in self.cnn.fc.parameters():
+            param.requires_grad = True
+
+        for name, param in self.cnn.named_parameters():
+            print(name, param.requires_grad)
+
+        print("\n"*5) 
+        # self.cnn = nn.Sequential(
+        #     nn.Conv2d(3, 6, 5, padding=1),
+        #     nn.MaxPool2d(2, 2, padding=1),
+        #     nn.Conv2d(6, 16, 5, padding=1),
+        #     nn.MaxPool2d(2, 2, padding=1),
+        #     nn.Flatten(),
+        #     nn.Linear(16 * 224//4 * 224//4, 512),
+        #     nn.ReLU(),
+        #     # nn.Linear(120, 84),
+        #     # nn.ReLU(),
+        #     # nn.Linear(84, 2),
+        #     # nn.LogSoftmax(dim=1)
+        # )
+
+        # self.final_cnn = nn.Sequential(nn.Linear(512, 2), nn.LogSoftmax(dim=1))
+
+        self.mlp = nn.Sequential(
+            nn.Linear(2, 10),
             nn.ReLU(),
             nn.Linear(10, 2),
             nn.LogSoftmax(dim=1)
@@ -48,12 +71,17 @@ class MOEModel(pl.LightningModule):
         self.val_steps_output   = []
         self.val_acc_output     = []
 
-    
-
         # Define the augmentation pipeline
+        # self.transform = transforms.Compose([
+        #     transforms.RandomRotation(90),  # Rotate the image by a random angle up to 30 degrees
+        #     transforms.ColorJitter(brightness=0.3) # Change the brightness by a random factor up to 0.3
+        # ])
+        
         self.transform = transforms.Compose([
-            transforms.RandomRotation(90),  # Rotate the image by a random angle up to 30 degrees
-            transforms.ColorJitter(brightness=0.3) # Change the brightness by a random factor up to 0.3
+            transforms.RandomRotation(180),
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomVerticalFlip(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
         # self.transform_normalize = transforms.Compose([
 
@@ -69,18 +97,17 @@ class MOEModel(pl.LightningModule):
             # Disable backward pass for SWA until the bug is fixed in lightning (https://github.com/Lightning-AI/lightning/issues/17245)
             # self.automatic_optimization = False
 
-    def forward(self, x):
-        # print(x.shape)
-        # print(x)
-        return self.model(x)
+    def forward(self, x_cnn, x_mlp):
+        
+        return self.cnn(x_cnn), self.mlp(x_mlp)
 
     def training_step(self, batch, batch_idx):    
-        # print("train", torch.cuda.memory_allocated())
+        
         torch.cuda.empty_cache()
         all_features, labels = batch
         mlp_features = all_features[1]
         cnn_features = all_features[0]
-   
+
         # print(cnn_features.shape)
         # exit()
         # for i in range(len(cnn_features)):
@@ -88,65 +115,67 @@ class MOEModel(pl.LightningModule):
         # preds = self.forward(mlp_features)
         # print(preds.shape)
         # print(preds)
-        
+
         preds = self.infer(cnn_features, mlp_features, cnn_features.shape[0], True)
-        loss = self.criterion(preds, labels)
+        loss  = self.criterion(preds[0], labels)
 
         self.train_steps_output.append(loss.detach().item())
         # print(loss)
         self.train_acc_output.append(
-            [preds.detach(), labels.detach()]
+            [preds[0].detach(), labels.detach()]
         )
         return loss
 
     def infer(self, cnn_features, mlp_features, batch_size, augment=False):
         
         cnn_features = cnn_features.view(-1, cnn_features.shape[-3], cnn_features.shape[-2], cnn_features.shape[-1])
-        # print(cnn_features.shape)
-        # get indices where last three dimensions are zero
+        # # print(cnn_features.shape)
+        # # get indices where last three dimensions are zero
         indices = torch.where(torch.sum(cnn_features, dim=(1, 2, 3)) == 0)[0]
-        # indices = torch.unique(indices)
+        # # indices = torch.unique(indices)
         mask = torch.ones(cnn_features.shape[0], dtype=torch.bool)
 
 
-            # Apply the transform to an image
-        features = cnn_features[mask]
-        # features = self.transform_normalize(features)
+        # # Apply the transform to an image
+        cnn_features = cnn_features[mask]
+        # # features = self.transform_normalize(features)
 
         if augment:
-            features = self.transform(features)
-
-
+            cnn_features = self.transform(cnn_features)
 
         # print(indices)
-        result = self.forward(features)
-        means = torch.zeros((batch_size, result.shape[1]))
-        # mins = torch.zeros((batch_size, result.shape[1]))
-        # maxs = torch.zeros((batch_size, result.shape[1]))
+        # pred_cnn, pred_mlp = self.forward(cnn_features, mlp_features)
+        pred_cnn, pred_mlp = self.forward(cnn_features, mlp_features)
+        means = torch.zeros((batch_size, pred_cnn.shape[1]))
+        # mins = torch.zeros((batch_size, pred_cnn.shape[1]))
+        # maxs = torch.zeros((batch_size, pred_cnn.shape[1]))
         # print(result.shape)
+
         last_label = 0
         i_means = 0
         for i in range(indices.shape[0]):
             current_label = indices[i]
             if current_label - last_label > 1:
-                means[i_means] = torch.mean(result[last_label:current_label], dim=0)
-                # mins[i_means] = torch.min(result[last_label:current_label], dim=0).values
-                # maxs[i_means] = torch.max(result[last_label:current_label], dim=0).values
+                means[i_means] = torch.mean(pred_cnn[last_label:current_label], dim=0)
+                # mins[i_means] = torch.min(pred_cnn[last_label:current_label], dim=0).values
+                # maxs[i_means] = torch.max(pred_cnn[last_label:current_label], dim=0).values
                 # print(i_means, last_label, current_label)
                 i_means += 1
             last_label = current_label
+
+
         # print(means.shape)
         # print(means)
         # result = torch.concat([means, mins, maxs], dim=1).to(device=cnn_features.device, dtype=cnn_features.dtype)
-        result = means.to(device=cnn_features.device, dtype=cnn_features.dtype)
+        pred_cnn = means.to(device=cnn_features.device, dtype=cnn_features.dtype)
         # print(result.shape)
-        result_final = self.final(result)
-
-        mlp_preds = self.mlp(torch.concat([result_final, mlp_features], dim=1))
+        # result_final = self.final_cnn(pred_cnn)
+        pred_mlp = self.mlp(mlp_features)
+        # mlp_preds = self.mlp(torch.concat([result_final, mlp_features], dim=1))
         # print(result_final.shape)
         # print(result_final)
 
-        return result_final
+        return pred_cnn, pred_mlp
 
     def validation_step(self, batch, batch_idx):   
         # print("Val", torch.cuda.memory_allocated())      
@@ -154,21 +183,22 @@ class MOEModel(pl.LightningModule):
         mlp_features = all_features[1]
         cnn_features = all_features[0]
 
-        # merge first and second dimension
-        
-        # exit()
-        # exit()
 
-        preds = self.infer(cnn_features, mlp_features, cnn_features.shape[0])
-        loss = self.criterion(preds, labels)
+        pred_cnn, pred_mlp = self.infer(cnn_features, mlp_features, cnn_features.shape[0])
+
+        loss_cnn = self.criterion(pred_cnn, labels)
+        loss_mlp = self.criterion(pred_mlp, labels)
+
+        self.update_optimizers(loss_cnn, loss_mlp)
         
         self.val_acc_output.append(
-            [preds.detach(), labels.detach()]
+            [loss_cnn.detach(), labels.detach()]
         )
         # print(loss)
 
-        self.val_steps_output.append(loss.item())
-        return loss
+        self.val_steps_output.append(loss_cnn.item())
+        
+        return loss_cnn
 
     def stats(self, preds_list, labels_list, cat="val"):
         pass
@@ -205,14 +235,44 @@ class MOEModel(pl.LightningModule):
         mlflow.log_metric("val_error", val_error, step=self.current_epoch)
         print(f"Epoch {self.current_epoch} val_error: {val_error} - val_acc: {acc}")
         self.val_steps_output = []
+    
+    def update_optimizers(self, loss_cnn, loss_mlp):
+        
+        self.cnn.train()
+        self.mlp.train()
+
+        self.manual_backward(loss_cnn)
+        self.optimizer_cnn.step()
+        self.optimizer_cnn.zero_grad()
+
+        self.manual_backward(loss_mlp)
+        self.optimizer_mlp.step()
+        self.optimizer_mlp.zero_grad()
+
 
     def configure_optimizers(self):
-        # optimizer = optim.Adam(self.parameters(), lr=1e-3)
-        # return optimizer
-        # return self.optimizer
-        optimizer = hydra.utils.instantiate(
-                    self.cfg.optimizer,
-                    *[self.model.parameters()], 
-                    **{"lr":self.cfg.train.lr, "weight_decay":self.cfg.train.weight_decay, "betas":(self.cfg.train.beta1, self.cfg.train.beta2)}
-                )
-        return optimizer
+
+        # if not self.cfg.train.freeze_cnn:
+        #     optimizer_cnn = hydra.utils.instantiate(
+        #         self.cfg.optimizer,
+        #         *[self.cnn.parameters()], 
+        #         **{"lr":self.cfg.train.lr}
+        #     )
+
+        #     optimizers.append(optimizer_cnn)
+
+        self.optimizer_cnn = hydra.utils.instantiate(
+                self.cfg.optimizer,
+                *[self.cnn.parameters()], 
+                **{"lr":self.cfg.train.lr}
+            )
+
+
+        self.optimizer_mlp = hydra.utils.instantiate(
+            self.cfg.optimizer,
+            *[self.mlp.parameters()], 
+            **{"lr":self.cfg.train.lr}
+        )
+
+        
+        return []

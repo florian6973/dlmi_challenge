@@ -10,7 +10,7 @@ class MLPModel(pl.LightningModule):
         super().__init__()
         self.cfg = cfg
         self.model     = nn.Sequential(
-            nn.Linear(3, 10),
+            nn.Linear(2, 10),
             nn.ReLU(),
             nn.Linear(10, 2),
             nn.LogSoftmax(dim=1)
@@ -87,6 +87,7 @@ class MLPModel(pl.LightningModule):
         mlflow.log_metric("val_acc", acc, step=self.current_epoch)
         self.val_acc_output = []
 
+        self.log("val_negacc", -acc)
         val_error = sum(self.val_steps_output) / len(self.val_steps_output)
         mlflow.log_metric("val_error", val_error, step=self.current_epoch)
         print(f"Epoch {self.current_epoch} val_error: {val_error} - val_acc: {acc}")

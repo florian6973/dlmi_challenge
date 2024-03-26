@@ -26,4 +26,13 @@ def plot_tensor_as_image(tensor):
     plt.imshow(tensor.permute(1, 2, 0))
     plt.show()
 
+def set_seed(seed):
 
+    import numpy as np
+    import torch
+    
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False

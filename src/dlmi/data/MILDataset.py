@@ -9,11 +9,13 @@ import os
 import torch.nn as nn
 
 class MILDataset(Dataset, CustomDataset):
-    def __init__(self, root_dir, split="train"):
+    def __init__(self, root_dir, split="train", load_images=True):
         if split == "train":
             self.data_dir = os.path.join(root_dir, "trainset")
         else:
             self.data_dir = os.path.join(root_dir, "testset")
+
+        self.load_images = load_images
 
         self.split = split
         self.patients = [p for p in os.listdir(self.data_dir) \
@@ -38,24 +40,31 @@ class MILDataset(Dataset, CustomDataset):
         return len(self.patients)
 
     def __getitem__(self, idx):
-        cur_patient          = self.patients[idx]
-        patient_images_paths = [p for p in self.image_paths if cur_patient in p]
-        # patient_images       = [read_image(path) for path in patient_images_paths]
-        patient_images = []
-        for path in patient_images_paths:
-            if path not in self.images:
-                self.images[path] = read_image(path)
-            patient_images.append(self.images[path])
-        
-        label = self.data.loc[self.data['ID'] == cur_patient, 'LABEL'].values[0]
-        age_count_features = self.data.loc[self.data['ID'] == cur_patient, ['GENDER', 'DOB', 'LYMPH_COUNT']].values[0].astype(np.float32)
+        cur_patient       = self.patients[idx]
+        label             = self.data.loc[self.data['ID'] == cur_patient, 'LABEL'].values[0]
+        clinical_features = self.data.loc[self.data['ID'] == cur_patient, ['GENDER', 'LYMPH_COUNT']].values[0].astype(np.float32)
 
-        features = torch.stack(patient_images)
-        # print("Returning patient images, age_count_features, label", torch.stack(patient_images).shape, age_count_features.shape, label)
-        features = nn.functional.pad(features, (0, 0, 0, 0, 0, 0, 0, 250 - features.shape[0]))
+        if self.load_images:
+            
+            patient_images_paths = [p for p in self.image_paths if cur_patient in p]
+            
+            patient_images = []
+            for path in patient_images_paths:
+                if path not in self.images:
+                    self.images[path] = read_image(path)
+                patient_images.append(self.images[path])
+            
+            
+
+            image_features = torch.stack(patient_images)
+            # print("Returning patient images, clinical_features, label", torch.stack(patient_images).shape, clinical_features.shape, label)
+            image_features = nn.functional.pad(image_features, (0, 0, 0, 0, 0, 0, 0, 250 - image_features.shape[0]))
+
+        else:
+            image_features = None
         # print("New shape", features.shape)
-        # print(age_count_features)
-        return [features, age_count_features], label
+        # print(clinical_features)
+        return [image_features, clinical_features], label
     
     def get_balanced_mask(self, train_size):
         patients_labels = self.data.loc[self.data['ID'].isin(self.patients), 'LABEL']
