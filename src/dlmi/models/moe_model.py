@@ -17,27 +17,23 @@ class MOEModel(pl.LightningModule):
         self.cfg = cfg
 
         self.cnn = torchvision.models.resnet34(weights="DEFAULT")
+        self.cnn.fc = nn.Identity()
 
-        if "freeze_cnn" in self.cfg.train.keys() and \
-           self.cfg.train.freeze_cnn:
-
+        if cfg.get('train', {}).get('freeze_cnn', False):
             for param in self.cnn.parameters():
                 param.requires_grad = False
         
-        self.cnn.fc = nn.Sequential(
-            nn.Linear(self.cnn.fc.in_features, 2), 
+
+        self.classifier_cnn = nn.Sequential(
+            nn.Linear(512, 2), 
             nn.LogSoftmax(dim=1)
         )
 
         # self.cnn.fc = nn.Linear(self.cnn.fc.in_features, 2)
 
-        for param in self.cnn.fc.parameters():
-            param.requires_grad = True
+        # for param in self.cnn.fc.parameters():
+        #     param.requires_grad = True
 
-        for name, param in self.cnn.named_parameters():
-            print(name, param.requires_grad)
-
-        print("\n"*5) 
         # self.cnn = nn.Sequential(
         #     nn.Conv2d(3, 6, 5, padding=1),
         #     nn.MaxPool2d(2, 2, padding=1),
@@ -114,15 +110,21 @@ class MOEModel(pl.LightningModule):
         # print(preds.shape)
         # print(preds)
 
-        preds = self.infer(cnn_features, mlp_features, cnn_features.shape[0], True)
-        loss  = self.criterion(preds[0], labels)
+        cnn_outputs, mlp_outputs = self.infer(cnn_features, mlp_features, cnn_features.shape[0], True)
+        loss_cnn = self.criterion(cnn_outputs, labels)
+        loss_mlp = self.criterion(mlp_outputs, labels)
+        
+        self.update_optimizers(loss_cnn, loss_mlp)
 
-        self.train_steps_output.append(loss.detach().item())
+        # preds = self.infer(cnn_features, mlp_features, cnn_features.shape[0], True)
+        # loss  = self.criterion(preds[0], labels)
+
+        self.train_steps_output.append(loss_cnn.detach().item())
         # print(loss)
         self.train_acc_output.append(
-            [preds[0].detach(), labels.detach()]
+            [cnn_outputs.detach(), mlp_outputs.detach(), labels.detach()]
         )
-        return loss
+        return loss_cnn
 
     def infer(self, cnn_features, mlp_features, batch_size, augment=False):
         
@@ -142,8 +144,7 @@ class MOEModel(pl.LightningModule):
             cnn_features = self.transform(cnn_features)
 
         # print(indices)
-        # pred_cnn, pred_mlp = self.forward(cnn_features, mlp_features)
-        pred_cnn, pred_mlp = self.forward(cnn_features, mlp_features)
+        pred_cnn, pred_mlp = self(cnn_features, mlp_features)
         means = torch.zeros((batch_size, pred_cnn.shape[1]))
         # mins = torch.zeros((batch_size, pred_cnn.shape[1]))
         # maxs = torch.zeros((batch_size, pred_cnn.shape[1]))
@@ -167,6 +168,8 @@ class MOEModel(pl.LightningModule):
         # result = torch.concat([means, mins, maxs], dim=1).to(device=cnn_features.device, dtype=cnn_features.dtype)
         pred_cnn = means.to(device=cnn_features.device, dtype=cnn_features.dtype)
         # print(result.shape)
+        pred_cnn = self.classifier_cnn(pred_cnn)
+
         # result_final = self.final_cnn(pred_cnn)
         pred_mlp = self.mlp(mlp_features)
         # mlp_preds = self.mlp(torch.concat([result_final, mlp_features], dim=1))
@@ -181,64 +184,65 @@ class MOEModel(pl.LightningModule):
         mlp_features = all_features[1]
         cnn_features = all_features[0]
 
-
         pred_cnn, pred_mlp = self.infer(cnn_features, mlp_features, cnn_features.shape[0])
 
         loss_cnn = self.criterion(pred_cnn, labels)
         loss_mlp = self.criterion(pred_mlp, labels)
 
-        self.update_optimizers(loss_cnn, loss_mlp)
-        
         self.val_acc_output.append(
-            [loss_cnn.detach(), labels.detach()]
+            [pred_cnn.detach(), pred_mlp.detach(), labels.detach()]
         )
-        # print(loss)
 
         self.val_steps_output.append(loss_cnn.item())
 
-        return loss_cnn
+        return loss_cnn, loss_mlp
 
     def stats(self, preds_list, labels_list, cat="val"):
         pass
 
     def on_train_epoch_end(self):
-        y_pre_all  = torch.cat([x[0] for x in self.train_acc_output])
-        labels_all = torch.cat([x[1] for x in self.train_acc_output])
+        y_pre_cnn  = torch.cat([x[0] for x in self.train_acc_output])
+        y_pre_mlp  = torch.cat([x[1] for x in self.train_acc_output])
+        labels_all = torch.cat([x[2] for x in self.train_acc_output])
 
-        acc = torchmetrics.functional.classification.accuracy(
-            y_pre_all, labels_all, task='multiclass', num_classes=2, average='macro'
+        acc_cnn = torchmetrics.functional.classification.accuracy(
+            y_pre_cnn, labels_all, task='multiclass', num_classes=2, average='macro'
+        )
+
+        acc_mlp = torchmetrics.functional.classification.accuracy(
+            y_pre_mlp, labels_all, task='multiclass', num_classes=2, average='macro'
         )
         # print(acc)
-        mlflow.log_metric("train_acc", acc, step=self.current_epoch)
+        mlflow.log_metric("train_acc", acc_cnn, step=self.current_epoch)
         self.train_acc_output = []
         # log the training error to mlflow
         train_error = sum(self.train_steps_output) / len(self.train_steps_output)
         mlflow.log_metric("train_error", train_error, step=self.current_epoch)
-        print(f"Epoch {self.current_epoch} train_error: {train_error} - train_acc: {acc}")
+        print(f"\nEpoch {self.current_epoch} train_error: {train_error:5g} - train_acc_cnn: {acc_cnn:5g} - train_acc_mlp: {acc_mlp:5g}")
         self.train_steps_output = []
 
     def on_validation_epoch_end(self):
         # log the validation error to mlflow
-        y_pre_all = torch.cat([x[0] for x in self.val_acc_output])
-        labels_all = torch.cat([x[1] for x in self.val_acc_output])
-        acc = torchmetrics.functional.classification.accuracy(
-            y_pre_all, labels_all, task='multiclass', num_classes=2, average='macro'
+        y_pre_cnn  = torch.cat([x[0] for x in self.val_acc_output])
+        y_pre_mlp  = torch.cat([x[1] for x in self.val_acc_output])
+        labels_all = torch.cat([x[2] for x in self.val_acc_output])
+        acc_cnn = torchmetrics.functional.classification.accuracy(
+            y_pre_cnn, labels_all, task='multiclass', num_classes=2, average='macro'
+        )
+        acc_mlp = torchmetrics.functional.classification.accuracy(
+            y_pre_cnn, labels_all, task='multiclass', num_classes=2, average='macro'
         )
         # print(acc)
-        mlflow.log_metric("val_acc", acc, step=self.current_epoch)
+        mlflow.log_metric("val_acc", acc_cnn, step=self.current_epoch)
         self.val_acc_output = []
 
         val_error = sum(self.val_steps_output) / len(self.val_steps_output)
-        self.log("val_negacc", -acc)
+        self.log("val_negacc", -acc_cnn)
         mlflow.log_metric("val_error", val_error, step=self.current_epoch)
-        print(f"Epoch {self.current_epoch} val_error: {val_error} - val_acc: {acc}")
+        print(f"\nEpoch {self.current_epoch} val_error: {val_error:5g} - val_acc_cnn: {acc_cnn:5g} - val_acc_mlp: {acc_mlp:5g}")
         self.val_steps_output = []
     
     def update_optimizers(self, loss_cnn, loss_mlp):
-        
-        self.cnn.train()
-        self.mlp.train()
-
         
         self.optimizer_cnn.zero_grad()
         self.manual_backward(loss_cnn)
@@ -248,6 +252,7 @@ class MOEModel(pl.LightningModule):
         self.manual_backward(loss_mlp)
         self.optimizer_mlp.step()
 
+        return [self.optimizer_cnn, self.optimizer_mlp]
 
     def configure_optimizers(self):
 
@@ -267,7 +272,7 @@ class MOEModel(pl.LightningModule):
 
         self.optimizer_mlp = hydra.utils.instantiate(
             self.cfg.optimizer,
-            *[self.mlp.parameters()], 
+            *[self.classifier_cnn.parameters()], 
             **{"lr":self.cfg.train.lr}
         )
 
