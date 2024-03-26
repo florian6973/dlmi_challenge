@@ -60,8 +60,6 @@ class MOEModel(pl.LightningModule):
             nn.Linear(10, 2),
             nn.LogSoftmax(dim=1)
         )
-        # print(self.model)
-        # exit()
 
         self.criterion = hydra.utils.instantiate(cfg.criterion)
         self.cfg = cfg
@@ -197,7 +195,7 @@ class MOEModel(pl.LightningModule):
         # print(loss)
 
         self.val_steps_output.append(loss_cnn.item())
-        
+
         return loss_cnn
 
     def stats(self, preds_list, labels_list, cat="val"):
@@ -241,13 +239,14 @@ class MOEModel(pl.LightningModule):
         self.cnn.train()
         self.mlp.train()
 
+        
+        self.optimizer_cnn.zero_grad()
         self.manual_backward(loss_cnn)
         self.optimizer_cnn.step()
-        self.optimizer_cnn.zero_grad()
-
+        
+        self.optimizer_mlp.zero_grad()
         self.manual_backward(loss_mlp)
         self.optimizer_mlp.step()
-        self.optimizer_mlp.zero_grad()
 
 
     def configure_optimizers(self):
@@ -258,8 +257,6 @@ class MOEModel(pl.LightningModule):
         #         *[self.cnn.parameters()], 
         #         **{"lr":self.cfg.train.lr}
         #     )
-
-        #     optimizers.append(optimizer_cnn)
 
         self.optimizer_cnn = hydra.utils.instantiate(
                 self.cfg.optimizer,
