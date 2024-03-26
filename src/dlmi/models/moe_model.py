@@ -230,7 +230,7 @@ class MOEModel(pl.LightningModule):
             y_pre_cnn, labels_all, task='multiclass', num_classes=2, average='macro'
         )
         acc_mlp = torchmetrics.functional.classification.accuracy(
-            y_pre_cnn, labels_all, task='multiclass', num_classes=2, average='macro'
+            y_pre_mlp, labels_all, task='multiclass', num_classes=2, average='macro'
         )
         # print(acc)
         mlflow.log_metric("val_acc", acc_cnn, step=self.current_epoch)
@@ -264,15 +264,15 @@ class MOEModel(pl.LightningModule):
         #     )
 
         self.optimizer_cnn = hydra.utils.instantiate(
-                self.cfg.optimizer,
-                *[self.cnn.parameters()], 
-                **{"lr":self.cfg.train.lr}
-            )
+            self.cfg.optimizer,
+            *[self.classifier_cnn.parameters()], 
+            **{"lr":self.cfg.train.lr}
+        )
 
 
         self.optimizer_mlp = hydra.utils.instantiate(
             self.cfg.optimizer,
-            *[self.classifier_cnn.parameters()], 
+            *[self.mlp.parameters()], 
             **{"lr":self.cfg.train.lr}
         )
 
