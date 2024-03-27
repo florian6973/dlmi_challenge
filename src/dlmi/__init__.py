@@ -136,7 +136,32 @@ def launch(cfg: DictConfig):
 
     np.savetxt("val_perf.txt", val_accs)
     np.savetxt("val_stats.txt", np.array([np.mean(val_accs), np.std(val_accs)]))
+
+    submit_final()
+
+
+def submit_final():
+    dfs = []
+    for file in glob.glob('submission_test_*.csv'):
+        print("Reading file: ", file)
+        df = pd.read_csv(file)
+        dfs.append(df)
     
+    final_df = pd.DataFrame(columns=['Id','Predicted'])
+    for i in range(len(dfs[0])):
+        zero = 0
+        one = 0
+        for j in range(len(dfs)):
+            if dfs[j].iloc[i,1] == 0:
+                zero += 1
+            else:
+                one += 1
+        print(dfs[0].iloc[i,0], zero, one)
+        if zero > one:
+            final_df.loc[len(final_df)] = [dfs[0].iloc[i,0],0]
+        else:
+            final_df.loc[len(final_df)] = [dfs[0].iloc[i,0],1]
+    final_df.to_csv('submission_test_final.csv', index=False)
 
 
 def update_config(cfg, config):
