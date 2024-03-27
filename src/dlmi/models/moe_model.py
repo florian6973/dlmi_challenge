@@ -64,6 +64,7 @@ class MOEModel(pl.LightningModule):
         self.train_steps_output_mlp = []
         self.train_acc_output   = []
         self.val_steps_output   = []
+        self.val_steps_output_mlp   = []
         self.val_acc_output     = []
 
         # Define the augmentation pipeline
@@ -196,6 +197,7 @@ class MOEModel(pl.LightningModule):
         )
 
         self.val_steps_output.append(loss_cnn.item())
+        self.val_steps_output_mlp.append(loss_mlp.item())
 
         return loss_cnn, loss_mlp
 
@@ -240,9 +242,10 @@ class MOEModel(pl.LightningModule):
         self.val_acc_output = []
 
         val_error = sum(self.val_steps_output) / len(self.val_steps_output)
+        val_error_mlp = sum(self.val_steps_output_mlp) / len(self.val_steps_output_mlp)
         self.log("val_negacc", -acc_cnn)
         mlflow.log_metric("val_error", val_error, step=self.current_epoch)
-        print(f"\nEpoch {self.current_epoch} val_error: {val_error:5g} - val_acc_cnn: {acc_cnn:5g} - val_acc_mlp: {acc_mlp:5g}")
+        print(f"\nEpoch {self.current_epoch} val_error: {val_error:5g} - val_error_mlp: {val_error_mlp:5g} - val_acc_cnn: {acc_cnn:5g} - val_acc_mlp: {acc_mlp:5g}")
         self.val_steps_output = []
     
     def update_optimizers(self, loss_cnn, loss_mlp):

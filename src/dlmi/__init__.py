@@ -50,11 +50,11 @@ def launch(cfg: DictConfig):
     # complete_train_set = MILDataset(train_set_path)
 
     if cfg.dataset_type == "MiniDataset":
-        complete_train_set = MiniDataset(train_set_path)
+        complete_train_set = MiniDataset(train_set_path, device)
         print("Train set loaded")
         train_set, val_set, mask_train = None, None, None
     elif cfg.dataset_type == "MILDataset":
-        complete_train_set = MILDataset(train_set_path)
+        complete_train_set = MILDataset(train_set_path, device)
         print("Train set loaded")
         train_set, val_set, mask_train = load_dataset(complete_train_set)
     else:

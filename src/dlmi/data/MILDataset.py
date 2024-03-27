@@ -11,13 +11,12 @@ import os
 import torch.nn as nn
 
 class MILDataset(Dataset, CustomDataset):
-    def __init__(self, root_dir, device,split="train", load_images=False):
+    def __init__(self, root_dir, device,split="train"):
         if split == "train":
             self.data_dir = os.path.join(root_dir, "trainset")
         else:
             self.data_dir = os.path.join(root_dir, "testset")
 
-        self.load_images = load_images
         self.device = device
         self.split = split
         self.patients = [p for p in os.listdir(self.data_dir) \
@@ -25,12 +24,6 @@ class MILDataset(Dataset, CustomDataset):
 
         self.data = read_data_csv(self.data_dir)
         self.image_paths = glob.glob(self.data_dir + '/**/*.jpg')
-        self.images = defaultdict(list)
-
-        if load_images:
-            for path in tqdm(self.image_paths, desc=f"Loading images"):
-                patient = os.path.basename(os.path.dirname(path))
-                self.images[patient].append(read_image(path))
 
         self.data['GENDER'] = self.data['GENDER'].map({'M': 0, 'F': 1}) # 1 nan value
         self.data.loc[self.data.GENDER.isna(), "GENDER"] = 0.5
@@ -52,34 +45,18 @@ class MILDataset(Dataset, CustomDataset):
         label             = self.data.loc[self.data['ID'] == cur_patient, 'LABEL'].values[0]
         clinical_features = self.data.loc[self.data['ID'] == cur_patient, ['GENDER', 'AGE', 'LYMPH_COUNT']].values[0].astype(np.float32)
 
-        if self.load_images:
-            
-            patient_images_paths = [p for p in self.image_paths if cur_patient in p]
-            
-            patient_images = []
-            for path in patient_images_paths:
-                if path not in self.images:
-                    self.images[path] = read_image(path).to("cuda")
-                patient_images.append(self.images[path])
-            
-            
-
-            image_features = torch.stack(patient_images)
-            # print("Returning patient images, clinical_features, label", torch.stack(patient_images).shape, clinical_features.shape, label)
-            image_features = nn.functional.pad(image_features, (0, 0, 0, 0, 0, 0, 0, 250 - image_features.shape[0]))
-
-        else:
-            # patient_images_paths = [p for p in self.image_paths if cur_patient in p]
-
-            for idx, path in enumerate(patient_images_paths):
-                patient_images[idx] = (read_image(path))
-                
-
-            # patient_images = self.images[cur_patient]
-
-        # image_features = torch.stack(patient_images)
+        patient_images_paths = [p for p in self.image_paths if cur_patient in p]
         
-        image_features = nn.functional.pad(patient_images, (0, 0, 0, 0, 0, 0, 0, 250 - patient_images.shape[0]))
+        patient_images = []
+        for path in patient_images_paths:
+            if path not in self.images:
+                self.images[path] = read_image(path).to(self.device)
+            patient_images.append(self.images[path])
+            
+
+        image_features = torch.stack(patient_images)
+        
+        image_features = nn.functional.pad(image_features, (0, 0, 0, 0, 0, 0, 0, 250 - image_features.shape[0]))
 
         # print("New shape", features.shape)
         return [image_features, clinical_features], label

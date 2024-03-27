@@ -33,13 +33,14 @@ class Sampler():
 # https://stackoverflow.com/questions/66065272/customizing-the-batch-with-specific-elements
 
 class MiniDataset(Dataset, CustomDataset):
-    def __init__(self, root_dir, split="train"):
+    def __init__(self, root_dir, device, split="train"):
         if split == "train":
             self.data_dir = os.path.join(root_dir, "trainset")
         else:
             self.data_dir = os.path.join(root_dir, "testset")
 
         self.split = split
+        self.device = device
         self.patients = [p for p in os.listdir(self.data_dir) \
                          if os.path.isdir(os.path.join(self.data_dir, p))]
 
@@ -96,7 +97,7 @@ class MiniDataset(Dataset, CustomDataset):
         
         path = self.image_paths[idx]
         if path not in self.images:
-            self.images[path] = read_image(path).to("cuda")
+            self.images[path] = read_image(path).to(self.device)
         cur_patient = self.get_patient(path)
         current_image = self.images[path]
   
