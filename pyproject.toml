@@ -9,7 +9,7 @@ dependencies = [
     "hydra-core",
     "mlflow",
     "lightning",
-    "ray[tune]"
+    "ray[tune]",
     "torchvision"
 ]
 
