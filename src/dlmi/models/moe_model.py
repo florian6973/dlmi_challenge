@@ -17,11 +17,16 @@ class MOEModel(pl.LightningModule):
         self.cfg = cfg
 
         self.cnn = torchvision.models.resnet34(weights="DEFAULT")
-        self.cnn.fc = nn.Identity()
 
         if cfg.get('train', {}).get('freeze_cnn', False):
             for param in self.cnn.parameters():
                 param.requires_grad = False
+
+        self.cnn.fc = nn.Sequential(
+            nn.Linear(self.cnn.fc.in_features, 512),
+            nn.ReLU(),
+            nn.Linear(512, 2),
+        )
         
 
         self.classifier_cnn = nn.Sequential(
@@ -99,6 +104,9 @@ class MOEModel(pl.LightningModule):
     def forward(self, x_cnn, x_mlp):        
         return self.cnn(x_cnn), self.mlp(x_mlp)
 
+    def predict(self, cnn_features, mlp_features, batch_size, augment=False):
+        return self.infer(cnn_features, mlp_features, batch_size, augment)[0]
+
     def training_step(self, batch, batch_idx):   
         torch.cuda.empty_cache()
         all_features, labels = batch
@@ -149,7 +157,11 @@ class MOEModel(pl.LightningModule):
             print(pred_mlp)
             exit()
 
-        means = torch.zeros((batch_size, pred_cnn.shape[1]))
+        # means = torch.zeros((batch_size, pred_cnn.shape[1]), requires_grad=True)
+
+        means = []
+
+        # print(indices)
 
         last_label = 0
         i_means = 0
@@ -159,7 +171,8 @@ class MOEModel(pl.LightningModule):
             if current_label - last_label > 1:
                 diff = current_label - last_label
                 # print("average from", last_label, "to", current_label, "diff", diff, "idx_pred_cnn", idx_pred_cnn)
-                means[i_means] = torch.mean(pred_cnn[idx_pred_cnn:idx_pred_cnn+diff], dim=0)
+                # means[i_means] = torch.mean(pred_cnn[idx_pred_cnn:idx_pred_cnn+diff], dim=0)
+                means.append(torch.mean(pred_cnn[idx_pred_cnn:idx_pred_cnn+diff], dim=0))
                 i_means += 1
                 idx_pred_cnn += diff
 
@@ -169,9 +182,11 @@ class MOEModel(pl.LightningModule):
         # print(means)
         # print(torch.isnan(means).any()) 
 
+        means = torch.stack(means)
+
 
         pred_cnn = means.to(device=cnn_features.device, dtype=cnn_features.dtype)
-        pred_cnn = self.classifier_cnn(pred_cnn)
+        # pred_cnn = self.classifier_cnn(pred_cnn)
 
         if torch.isnan(pred_cnn).any():
             print("Nan in pred_cnn")
@@ -266,10 +281,11 @@ class MOEModel(pl.LightningModule):
         #         **{"lr":self.cfg.train.lr}
         #     )
 
+        from itertools import chain
         optimizer_cnn = hydra.utils.instantiate(
             self.cfg.optimizer,
-            *[self.classifier_cnn.parameters()], 
-            **{"lr":1}#self.cfg.train.lr}
+            *[chain(self.cnn.parameters(), self.classifier_cnn.parameters())],
+            **{"lr":0.1}#self.cfg.train.lr}
         )
 
 

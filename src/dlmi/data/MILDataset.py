@@ -57,8 +57,10 @@ class MILDataset(Dataset, CustomDataset):
             
 
         image_features = torch.stack(patient_images)
+        image_features = image_features[:300]
         
-        image_features = nn.functional.pad(image_features, (0, 0, 0, 0, 0, 0, 0, 250 - image_features.shape[0]))
+        # print(image_features.shape)
+        image_features = nn.functional.pad(image_features, (0, 0, 0, 0, 0, 0, 0, 301 - image_features.shape[0]))
 
         # print("New shape", features.shape)
         return [image_features, clinical_features], label

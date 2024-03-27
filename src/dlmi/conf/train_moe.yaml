@@ -14,11 +14,11 @@ dataset_type: "MILDataset"
 train: 
   lr: 1e-2
   batch_size : 2
-  num_epochs: 50
+  num_epochs: 10 #50
   weight_decay: 0 #0.0005
   beta1: 0.9
   beta2: 0.999
-  freeze_cnn: True
+  freeze_cnn: False
 
 # Experiment parameters
 exp: 

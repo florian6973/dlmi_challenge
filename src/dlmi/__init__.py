@@ -228,9 +228,11 @@ def run_infer(dataset, main_dataset, model, name, device, mask=None):
             # images[1] = images[1].to(device)
             # print(images[1].shape)
 
-            y_pre = model(images[1].to(device))
+            # mlp
+            # y_pre = model(images[1].to(device))
 
-            # y_pre = model.infer(images[0].unsqueeze(1).to(device), images[1].to(device), images[0].shape[0])
+            # moe
+            y_pre = model.predict(images[0].unsqueeze(1).to(device), images[1].to(device), images[0].shape[0])
 
             # print(y_pre)
             # print(labels)
