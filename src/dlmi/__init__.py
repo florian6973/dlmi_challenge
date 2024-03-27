@@ -9,11 +9,10 @@ import hydra
 import mlflow
 import torch
 from dlmi.data.data import load_dataset
-from dlmi.models.models import save_model
-from dlmi.data.patientDataset import PatientDataset
 from dlmi.data.MILDataset import MILDataset
 from dlmi.data.MiniDataset import MiniDataset, Sampler
 from dlmi.utils.mlflow import log_params_from_omegaconf_dict
+from dlmi.data.MiniDataset import MiniDataset, Sampler
 
 from hydra import utils
 from omegaconf import DictConfig
@@ -21,11 +20,6 @@ from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 
 from pytorch_lightning.callbacks import ModelCheckpoint
-
-import random
-
-from dlmi.models.train_model import BasicModel, MILModel
-
 
 # from ray import train, tune
 import ray.tune as tune
@@ -59,16 +53,17 @@ def launch(cfg: DictConfig):
         complete_train_set = MiniDataset(train_set_path)
         print("Train set loaded")
         train_set, val_set, mask_train = None, None, None
-    else:
+    elif cfg.dataset_type == "MILDataset":
         complete_train_set = MILDataset(train_set_path)
         print("Train set loaded")
         train_set, val_set, mask_train = load_dataset(complete_train_set)
+    else:
+        raise ValueError("Dataset type not supported, must be MiniDataset or MILDataset")
 
 
     # mlflow.set_tracking_uri("file://" + utils.get_original_cwd() + "/mlruns")
     mlflow.set_tracking_uri(uri="http://127.0.0.1:5001")
     mlflow.set_experiment(cfg.mlflow.runname)
-    batch_size = cfg.train.batch_size
     # start new run
     # with mlflow.start_run():
     #     log_params_from_omegaconf_dict(cfg) 
@@ -152,6 +147,9 @@ def train_dlmi(config, cfg, complete_train_set, train_set, val_set):
             s_val = Sampler(complete_train_set.test_classes, class_per_batch=1, batch_size=batch_size)
             train_dataset = DataLoader(complete_train_set, batch_sampler=s_train)
             val_dataset = DataLoader(complete_train_set, batch_sampler=s_val)
+        elif cfg.dataset_type == "MILDataset":
+            train_dataset = DataLoader(train_set, batch_size, shuffle=True, num_workers=0)
+            val_dataset   = DataLoader(val_set,   batch_size, shuffle=False, num_workers=0)
 
         checkpoint_callback = ModelCheckpoint(monitor="val_negacc")
 

@@ -76,7 +76,7 @@ class MOEModel(pl.LightningModule):
             transforms.RandomRotation(180),
             transforms.RandomHorizontalFlip(),
             transforms.RandomVerticalFlip(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            # transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
         # self.transform_normalize = transforms.Compose([
 
@@ -255,8 +255,6 @@ class MOEModel(pl.LightningModule):
         self.manual_backward(loss_mlp)
         self.optimizer_mlp.step()
 
-        return [self.optimizer_cnn, self.optimizer_mlp]
-
     def configure_optimizers(self):
 
         # if not self.cfg.train.freeze_cnn:
@@ -279,5 +277,4 @@ class MOEModel(pl.LightningModule):
             **{"lr":self.cfg.train.lr}
         )
 
-        
-        return []
+        return [self.optimizer_cnn, self.optimizer_mlp]

@@ -1,6 +1,8 @@
 from dlmi.utils.utils import read_data_csv, read_image, plot_tensor_as_image
 from dlmi.data.CustomDataset import CustomDataset
 from torch.utils.data import Dataset
+from collections import defaultdict
+from tqdm import tqdm
 import numpy as np
 import pandas as pd
 import torch
@@ -9,20 +11,26 @@ import os
 import torch.nn as nn
 
 class MILDataset(Dataset, CustomDataset):
-    def __init__(self, root_dir, split="train", load_images=True):
+    def __init__(self, root_dir, device,split="train", load_images=False):
         if split == "train":
             self.data_dir = os.path.join(root_dir, "trainset")
         else:
             self.data_dir = os.path.join(root_dir, "testset")
 
         self.load_images = load_images
-
+        self.device = device
         self.split = split
         self.patients = [p for p in os.listdir(self.data_dir) \
                          if os.path.isdir(os.path.join(self.data_dir, p))]
 
         self.data = read_data_csv(self.data_dir)
         self.image_paths = glob.glob(self.data_dir + '/**/*.jpg')
+        self.images = defaultdict(list)
+
+        if load_images:
+            for path in tqdm(self.image_paths, desc=f"Loading images"):
+                patient = os.path.basename(os.path.dirname(path))
+                self.images[patient].append(read_image(path))
 
         self.data['GENDER'] = self.data['GENDER'].map({'M': 0, 'F': 1}) # 1 nan value
         self.data.loc[self.data.GENDER.isna(), "GENDER"] = 0.5
@@ -61,9 +69,19 @@ class MILDataset(Dataset, CustomDataset):
             image_features = nn.functional.pad(image_features, (0, 0, 0, 0, 0, 0, 0, 250 - image_features.shape[0]))
 
         else:
-            image_features = None
+            # patient_images_paths = [p for p in self.image_paths if cur_patient in p]
+
+            for idx, path in enumerate(patient_images_paths):
+                patient_images[idx] = (read_image(path))
+                
+
+            # patient_images = self.images[cur_patient]
+
+        # image_features = torch.stack(patient_images)
+        
+        image_features = nn.functional.pad(patient_images, (0, 0, 0, 0, 0, 0, 0, 250 - patient_images.shape[0]))
+
         # print("New shape", features.shape)
-        # print(clinical_features)
         return [image_features, clinical_features], label
     
     def get_balanced_mask(self, train_size):
@@ -128,18 +146,3 @@ class MILDataset(Dataset, CustomDataset):
             print(f"Balanced accuracy for {dataset}: {balanced_accuracy_score(df['LABEL_y'], df['LABEL_x'])}")
 
         return df
-    
-    
-if __name__ == "__main__":
-
-    path = r"C:\Users\gaumu\GitHub\dlmi_challenge\data\raw"
-
-    data = MILDataset(path)
-
-    img = iter(data).__next__()[0]
-
-    import matplotlib.pyplot as plt
-
-    
-    plot_tensor_as_image(img[0])
-    plot_tensor_as_image(img[1])
