@@ -51,7 +51,7 @@ class MILDataset(Dataset, CustomDataset):
             patient_images = []
             for path in patient_images_paths:
                 if path not in self.images:
-                    self.images[path] = read_image(path)
+                    self.images[path] = read_image(path).to("cuda")
                 patient_images.append(self.images[path])
             
             

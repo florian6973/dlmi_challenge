@@ -8,6 +8,7 @@ import torch
 import glob
 import os
 import torch.nn as nn
+import random
 
 class Sampler():
     def __init__(self, classes, class_per_batch, batch_size):
@@ -47,7 +48,7 @@ class MiniDataset(Dataset, CustomDataset):
 
         self.data['GENDER'] = self.data['GENDER'].map({'M': 0, 'F': 1}) # 1 nan value
         self.data.loc[self.data.GENDER.isna(), "GENDER"] = 0.5
-        # self.data['DOB'] = (pd.to_datetime('2021-01-01') - pd.to_datetime(self.data['DOB'], format='mixed')).dt.days / (100*365) # scaling normalization
+        self.data['AGE'] = (pd.to_datetime('2021-01-01') - pd.to_datetime(self.data['DOB'], format='mixed')).dt.days / (100*365) # scaling normalization
         self.data['LYMPH_COUNT'] = self.data['LYMPH_COUNT'].astype(np.float32) / 200 # scaling normalization
 
         # print(self.data['GENDER'].isna().sum())
@@ -63,15 +64,22 @@ class MiniDataset(Dataset, CustomDataset):
         return len(self.image_paths)
     
     def build_classes(self):
-        self.classes = []
+        self.train_classes = []
+        self.test_classes = []
         current = []
         last_patient = self.get_patient(self.image_paths[0])
+        is_train = random.random() < 0.8
         for i, image_path in enumerate(self.image_paths):
             patient = self.get_patient(image_path)
             if patient != last_patient:
-                self.classes.append(current)
+                # self.classes.append(current)
+                if is_train:
+                    self.train_classes.append(current)
+                else:
+                    self.test_classes.append(current)
                 current = []
                 last_patient = patient
+                is_train = random.random() < 0.8
             current.append(i)
         
         
@@ -88,12 +96,13 @@ class MiniDataset(Dataset, CustomDataset):
         
         path = self.image_paths[idx]
         if path not in self.images:
-            self.images[path] = read_image(path)
+            self.images[path] = read_image(path).to("cuda")
         cur_patient = self.get_patient(path)
         current_image = self.images[path]
-        
+  
         label = self.data.loc[self.data['ID'] == cur_patient, 'LABEL'].values[0]
-        age_count_features = self.data.loc[self.data['ID'] == cur_patient, ['GENDER',  'LYMPH_COUNT']].values[0].astype(np.float32)
+        age_count_features = self.data.loc[self.data['ID'] == cur_patient, ['GENDER', 'LYMPH_COUNT', 'AGE']].values[0].astype(np.float32)
+
 
         features = current_image #torch.stack(patient_images)
         # print("Returning patient images, age_count_features, label", torch.stack(patient_images).shape, age_count_features.shape, label)
