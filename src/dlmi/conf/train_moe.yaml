@@ -23,7 +23,7 @@ train:
 # Experiment parameters
 exp: 
   name: "Classification"
-  data_path: "/../../data/raw/raw" 
+  data_path: "/data/raw/" #"/../../data/raw/raw" 
   checkpoint: "models/linear"
   seed: 29
   tune:
