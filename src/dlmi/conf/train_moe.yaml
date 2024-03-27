@@ -25,7 +25,7 @@ exp:
   name: "Classification"
   data_path: "/../../data/raw/raw" 
   checkpoint: "models/linear"
-  seed: 29
+  seed: 10 # 15 0.82 #29 0.92
   tune:
     enabled: false
     num_samples: 20
