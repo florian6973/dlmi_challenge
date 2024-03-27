@@ -110,7 +110,7 @@ def launch(cfg: DictConfig):
     # device = "cpu"
     run_infer(test_dataset, complete_test_set, model, "test", device, None)
 
-    val_dataset   = DataLoader(val_set,   batch_size, shuffle=False, num_workers=0)
+    val_dataset   = DataLoader(val_set,  cfg.train.batch_size, shuffle=False, num_workers=0)
     run_infer(val_dataset, complete_train_set, model, "val", device, (~mask_train))
 
 def update_config(cfg, config):
@@ -150,7 +150,6 @@ def train_dlmi(config, cfg, complete_train_set, train_set, val_set):
         elif cfg.dataset_type == "MILDataset":
             train_dataset = DataLoader(train_set, batch_size, shuffle=True, num_workers=0)
             val_dataset   = DataLoader(val_set,   batch_size, shuffle=False, num_workers=0)
-
         checkpoint_callback = ModelCheckpoint(monitor="val_negacc")
 
         trainer = pl.Trainer(
@@ -163,7 +162,7 @@ def train_dlmi(config, cfg, complete_train_set, train_set, val_set):
         )
         trainer.fit(model, train_dataset, val_dataset)
 
-        model.load_state_dict(torch.load(checkpoint_callback.best_model_path)["state_dict"])
+        # model.load_state_dict(torch.load(checkpoint_callback.best_model_path)["state_dict"])
 
     if config is None:
         return model
