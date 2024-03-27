@@ -12,7 +12,9 @@ dataset_type: "MILDataset"
 
 # Training parameters
 train: 
-  lr: 1e-2
+  lr_cnn: 1e-3
+  lr_mlp: 1e-2
+  lr_final: 1e-2
   batch_size : 5
   num_epochs: 50
   weight_decay: 0 #0.0005

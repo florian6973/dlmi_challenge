@@ -317,20 +317,20 @@ class MOEModel(pl.LightningModule):
         optimizer_cnn = hydra.utils.instantiate(
             self.cfg.optimizer,
             *[chain(self.cnn.parameters(), self.classifier_cnn.parameters())],
-            **{"lr":0.001}#self.cfg.train.lr}
+            **{"lr":self.cfg.train.lr_cnn}
         )
 
 
         optimizer_mlp = hydra.utils.instantiate(
             self.cfg.optimizer,
             *[self.mlp.parameters()], 
-            **{"lr":0.01}#self.cfg.train.lr}
+            **{"lr":self.cfg.train.lr_mlp}
         )
 
         optimizer_final = hydra.utils.instantiate(
             self.cfg.optimizer,
             *[self.final_classifier.parameters()], 
-            **{"lr":0.01}#self.cfg.train.lr}
+            **{"lr":self.cfg.train.lr_final}
         )
 
         return [optimizer_cnn, optimizer_mlp, optimizer_final]
