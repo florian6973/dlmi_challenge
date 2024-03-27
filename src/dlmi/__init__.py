@@ -12,6 +12,7 @@ from dlmi.data.data import load_dataset, load_kfolds
 from dlmi.data.MILDataset import MILDataset
 from dlmi.data.MiniDataset import MiniDataset, Sampler
 from dlmi.utils.mlflow import log_params_from_omegaconf_dict
+from dlmi.utils.utils import set_seed
 from dlmi.data.MiniDataset import MiniDataset, Sampler
 
 from hydra import utils
@@ -28,7 +29,6 @@ from ray.air.integrations.mlflow import setup_mlflow
 from ray.tune.integration.pytorch_lightning import TuneReportCheckpointCallback
 from ray.tune.schedulers import ASHAScheduler
 
-
 from tqdm import tqdm
 
 import random
@@ -37,23 +37,15 @@ def run_local_mlflow():
     subprocess.run('mlflow server --host 127.0.0.1 --port 5001'.split())
 
     
-
 @hydra.main(config_path="dlmi/conf", config_name="train_moe", version_base="1.1")
 def launch(cfg: DictConfig):
+    set_seed(cfg.exp.seed)
+    device = "cuda" if torch.cuda.is_available() else "cpu"    
+
     working_dir = os.getcwd()
     train_set_path = utils.get_original_cwd() + cfg.exp.data_path
-
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-
-    # set_seed(cfg.exp.seed)
-    random.seed(cfg.exp.seed)
-    np.random.seed(cfg.exp.seed)
-    torch.manual_seed(cfg.exp.seed)
+    print("Working dir: ", working_dir, "Data path: ", train_set_path, "Device: ", device)
     
-    print("Working dir: ", working_dir)
-    # complete_train_set = PatientDataset(train_set_path)
-    # complete_train_set = MILDataset(train_set_path)
-
     if cfg.dataset_type == "MiniDataset":
         complete_train_set = MiniDataset(train_set_path, device)
         print("Train set loaded")

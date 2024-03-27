@@ -147,7 +147,7 @@ class MOEModel(pl.LightningModule):
         # print(mask)
         cnn_features = cnn_features[mask]
 
-        augment = False
+        # augment = False
         if augment:
             cnn_features = self.transform(cnn_features)
         

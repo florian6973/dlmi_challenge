@@ -10,7 +10,11 @@ dependencies = [
     "mlflow",
     "lightning",
     "ray[tune]",
-    "torchvision"
+    "torchvision",
+    "scikit-learn",
+    "matplotlib",
+    "torch",
+    "jupyter"
 ]
 
 description = "Package containing experiments for the Deep Learning for Medical Imaging Kaggle challenge"
@@ -22,7 +26,6 @@ package-dir = {"" = "src"}
 
 [project.scripts]
 dlmi_train = "dlmi:launch"
-dlmi_pred = "dlmi:pred"
 mlflow_run = "dlmi:run_local_mlflow"
 
 [tool.setuptools.packages.find]
