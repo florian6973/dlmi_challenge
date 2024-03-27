@@ -252,14 +252,14 @@ class MOEModel(pl.LightningModule):
 
 
         # print(acc)
-        mlflow.log_metric("train_acc", acc_cnn, step=self.current_epoch)
+        mlflow.log_metric("train_acc", acc_final, step=self.current_epoch)
         self.train_acc_output = []
         # log the training error to mlflow
         train_error = sum(self.train_steps_output) / len(self.train_steps_output)
         train_error_mlp = sum(self.train_steps_output_mlp) / len(self.train_steps_output_mlp)
         train_error_final = sum(self.train_steps_output_total) / len(self.train_steps_output_total)
-        mlflow.log_metric("train_error", train_error, step=self.current_epoch)
-        print(f"\nEpoch {self.current_epoch} train_error: {train_error:5g} - train_error_mlp: {train_error_mlp:5g} - train_error_final: {train_error_final:5g} - train_acc_cnn: {acc_cnn:5g} - train_acc_mlp: {acc_mlp:5g} - train_acc_final: {acc_final:5g}")
+        mlflow.log_metric("train_error", train_error_final, step=self.current_epoch)
+        print(f"\nEpoch {self.current_epoch} train_error_cnn: {train_error:5g} - train_error_mlp: {train_error_mlp:5g} - train_error_final: {train_error_final:5g} - train_acc_cnn: {acc_cnn:5g} - train_acc_mlp: {acc_mlp:5g} - train_acc_final: {acc_final:5g}")
         self.train_steps_output = []
 
     def on_validation_epoch_end(self):
@@ -278,15 +278,15 @@ class MOEModel(pl.LightningModule):
             y_pre_total, labels_all, task='multiclass', num_classes=2, average='macro'
         )
         # print(acc)
-        mlflow.log_metric("val_acc", acc_cnn, step=self.current_epoch)
+        mlflow.log_metric("val_acc", acc_final, step=self.current_epoch)
         self.val_acc_output = []
 
         val_error = sum(self.val_steps_output) / len(self.val_steps_output)
         val_error_mlp = sum(self.val_steps_output_mlp) / len(self.val_steps_output_mlp)
         val_error_final = sum(self.val_steps_output_total) / len(self.val_steps_output_total)
-        self.log("val_negacc", -acc_cnn)
-        mlflow.log_metric("val_error", val_error, step=self.current_epoch)
-        print(f"\nEpoch {self.current_epoch} val_error: {val_error:5g} - val_error_mlp: {val_error_mlp:5g} - val_error_final: {val_error_final:5g} - val_acc_cnn: {acc_cnn:5g} - val_acc_mlp: {acc_mlp:5g} - val_acc_final: {acc_final:5g}")
+        self.log("val_negacc", -acc_final)
+        mlflow.log_metric("val_error", val_error_final, step=self.current_epoch)
+        print(f"\nEpoch {self.current_epoch} val_error_cnn: {val_error:5g} - val_error_mlp: {val_error_mlp:5g} - val_error_final: {val_error_final:5g} - val_acc_cnn: {acc_cnn:5g} - val_acc_mlp: {acc_mlp:5g} - val_acc_final: {acc_final:5g}")
         self.val_steps_output = []
     
     def update_optimizers(self, loss_cnn, loss_mlp, loss_final):

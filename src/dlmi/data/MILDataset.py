@@ -36,8 +36,8 @@ class MILDataset(Dataset, CustomDataset):
         # exit()
 
         self.images = {}
-        for path in tqdm(self.image_paths):
-            self.images[path] = read_image(path).to(self.device)
+        # for path in tqdm(self.image_paths):
+        #     self.images[path] = read_image(path).to(self.device)
 
     def __len__(self):
         return len(self.patients)
@@ -94,7 +94,7 @@ class MILDataset(Dataset, CustomDataset):
         # # print(patients)
         # return indices
 
-    def get_patient_labels(self, preds, mask=None, dataset="test"):
+    def get_patient_labels(self, preds, mask=None, dataset="test", fold=0):
         patient_labels = []
         counters = {}
         k = 0
@@ -109,21 +109,23 @@ class MILDataset(Dataset, CustomDataset):
             k += 1
             # patient_labels.append([patient, preds[i].item()])
         import json
-        with open(f'counters_{dataset}.json', 'w') as f:
+        with open(f'counters_{dataset}_{fold}.json', 'w') as f:
             json.dump(counters, f)
         df = pd.DataFrame(columns=["ID", "LABEL"])
         for p in counters:
             df.loc[len(df)] = [p, np.argmax(counters[p])]
-        df.rename(columns={"ID":"Id", "LABEL":"Predicted"}).to_csv(f"submission_{dataset}.csv", index=False)
+        df.rename(columns={"ID":"Id", "LABEL":"Predicted"}).to_csv(f"submission_{dataset}_{fold}.csv", index=False)
         if dataset != "test":
             true_labels = self.data.loc[self.data['ID'].isin(df['ID'])]
 
             # join the two dataframes
             df = df.merge(true_labels, on="ID")
-            df.to_csv(f"submission_{dataset}_with_true_labels.csv", index=False)
+            df.to_csv(f"submission_{dataset}_{fold}_with_true_labels.csv", index=False)
 
             # balanced accuracy between LABEL_x and LABEL_y
             from sklearn.metrics import balanced_accuracy_score
-            print(f"Balanced accuracy for {dataset}: {balanced_accuracy_score(df['LABEL_y'], df['LABEL_x'])}")
-
-        return df
+            bac = balanced_accuracy_score(df['LABEL_y'], df['LABEL_x'])
+            print(f"Balanced accuracy for {dataset}: {bac}")
+            return bac
+        else:
+            return 0

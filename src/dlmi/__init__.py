@@ -8,7 +8,7 @@ import numpy as np
 import hydra
 import mlflow
 import torch
-from dlmi.data.data import load_dataset
+from dlmi.data.data import load_dataset, load_kfolds
 from dlmi.data.MILDataset import MILDataset
 from dlmi.data.MiniDataset import MiniDataset, Sampler
 from dlmi.utils.mlflow import log_params_from_omegaconf_dict
@@ -61,7 +61,8 @@ def launch(cfg: DictConfig):
     elif cfg.dataset_type == "MILDataset":
         complete_train_set = MILDataset(train_set_path, device)
         print("Train set loaded")
-        train_set, val_set, mask_train = load_dataset(complete_train_set)
+        # train_set, val_set, mask_train = load_dataset(complete_train_set)
+        sets = load_kfolds(complete_train_set)
     else:
         raise ValueError("Dataset type not supported, must be MiniDataset or MILDataset")
 
@@ -97,27 +98,46 @@ def launch(cfg: DictConfig):
 
         # train(cfg.train.num_epochs, cfg.train.batch_size, criterion, optimizer, model, train_set)
 
+    val_accs = []
+    for i, one_set in enumerate(sets):
+        train_set = one_set[0]
+        val_set = one_set[1]
+        mask_train = np.array([True if i in train_set.indices else False for i in range(len(complete_train_set.patients))])
 
-    if "tune" in cfg.exp.keys() and cfg.exp.tune.enabled:
-        model = tune_cfg(cfg, train_set, val_set)
-    else:
-        # model = train_dlmi(None, cfg, complete_train_set, train_set, val_set)
-        model = train_dlmi(None, cfg, complete_train_set, train_set, val_set)
+        print(
+            f"Training fold {i + 1}/{len(sets)} with {len(train_set)} samples and validating with {len(val_set)} samples."
+        )
+
+        if "tune" in cfg.exp.keys() and cfg.exp.tune.enabled:
+            model = tune_cfg(cfg, train_set, val_set)
+        else:
+            # model = train_dlmi(None, cfg, complete_train_set, train_set, val_set)
+            model = train_dlmi(None, cfg, complete_train_set, train_set, val_set)
 
 
-    # save_model(working_dir + "/checkpoint.pt", model)
-    # logging.info(f"Checkpoint saved at {working_dir}")
+        # save_model(working_dir + "/checkpoint.pt", model)
+        # logging.info(f"Checkpoint saved at {working_dir}")
 
-    gc.collect()
-    model = model.to(device)
-    complete_test_set = MILDataset(train_set_path, split="test", device=device)
-    test_dataset = DataLoader(complete_test_set, 1, shuffle=False, num_workers=0)
-    # device = "cpu"
-    run_infer(test_dataset, complete_test_set, model, "test", device, None)
+        gc.collect()
+        model = model.to(device)
+        complete_test_set = MILDataset(train_set_path, split="test", device=device)
+        test_dataset = DataLoader(complete_test_set, 1, shuffle=False, num_workers=0)
+        # device = "cpu"
+        run_infer(test_dataset, complete_test_set, model, "test", device, None, i)
 
-    batch_size = cfg.train.batch_size
-    val_dataset   = DataLoader(val_set,   batch_size, shuffle=False, num_workers=0)
-    run_infer(val_dataset, complete_train_set, model, "val", device, (~mask_train))
+        batch_size = cfg.train.batch_size
+        val_dataset   = DataLoader(val_set,   batch_size, shuffle=False, num_workers=0)
+        bac = run_infer(val_dataset, complete_train_set, model, "val", device, (~mask_train), i)
+        val_accs.append(bac)
+
+    print("Validation accuracies: ", val_accs)
+    print("Mean validation accuracy: ", np.mean(val_accs))
+    print("Std validation accuracy: ", np.std(val_accs))
+
+    np.savetxt("val_perf.txt", val_accs)
+    np.savetxt("val_stats.txt", np.array([np.mean(val_accs), np.std(val_accs)]))
+    
+
 
 def update_config(cfg, config):
     cfg.train.batch_size = config["batch_size"]
@@ -216,7 +236,7 @@ def tune_cfg(cfg, train_set, val_set):
 
     
 # https://medium.com/@soumensardarintmain/manage-cuda-cores-ultimate-memory-management-strategy-with-pytorch-2bed30cab1#:~:text=The%20recommended%20way%20is%20to,first%20and%20then%20call%20torch.
-def run_infer(dataset, main_dataset, model, name, device, mask=None):
+def run_infer(dataset, main_dataset, model, name, device, mask=None, fold=0):
     preds = []
     # model = model.to(device)
     model.eval()
@@ -241,7 +261,9 @@ def run_infer(dataset, main_dataset, model, name, device, mask=None):
             preds.append(selected_class)
         
         preds = torch.cat(preds)
-        main_dataset.get_patient_labels(preds, mask, name)
+        bac = main_dataset.get_patient_labels(preds, mask, name, fold)
+
+        return bac
     
 
     # TODO Maybe improve the logging of the training loop ?

@@ -2,6 +2,9 @@ from dlmi.data.CustomDataset import CustomDataset
 from torch.utils.data import Subset
 import torch
 
+import numpy as np
+from sklearn.model_selection import StratifiedKFold
+
 def load_dataset(dataset: CustomDataset, train_proportion=0.8):
     # generator = torch.Generator()
     # generator.manual_seed(seed)
@@ -23,3 +26,23 @@ def load_dataset(dataset: CustomDataset, train_proportion=0.8):
 
 
     return train_set, val_set, mask_train
+
+def load_kfolds(dataset: CustomDataset, k=5):
+    skf = StratifiedKFold(n_splits=k)
+    # skf.get_n_splits(dataset.patients, dataset.data['LABEL'].values)
+    # print(skf)
+    # exit()
+    X = dataset.patients
+    y = dataset.data['LABEL'].values
+    sets = []
+    for i, (train_index, test_index) in enumerate(skf.split(X, y)):
+        print(f"Fold {i}:")
+        print(f"  Train: index={train_index}")
+        print(f"  Test:  index={test_index}")
+        print(np.count_nonzero(y[train_index] == 1), np.count_nonzero(y[train_index] == 0))
+        print(np.count_nonzero(y[test_index] == 1), np.count_nonzero(y[test_index] == 0))
+        sets.append([
+            Subset(dataset, train_index),
+            Subset(dataset, test_index),
+        ])
+    return sets
