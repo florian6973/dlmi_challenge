@@ -14,7 +14,7 @@ The main function is in `src/dlmi/__init__.py`
 
 - Start mlflow: run the command `mlflow_run`
 - Launch the program (training+inference on test): `dlmi_train`
-    - You can specify the config file `dlmi_train <path/to/config_file.yaml>`: some examples are in `src/dlmi/conf`
+    - You can specify the config file `dlmi_train ++config_name=[train_mlp,train_moe]`: some examples are in `src/dlmi/conf`
 
 Tested on Linux + Nvidia V100S 32GB. Training time of less than 30 minutes.
 

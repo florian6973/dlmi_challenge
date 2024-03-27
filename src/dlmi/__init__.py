@@ -169,7 +169,6 @@ def update_config(cfg, config):
 def train_dlmi(config, cfg, complete_train_set, train_set, val_set):
     metrics = ["val_negacc"]
     tune_callback = TuneReportCheckpointCallback(metrics, on="validation_end")
-    # mlflow.pytorch.autolog()
     if config is not None:
         cfg = update_config(cfg, config)
     with mlflow.start_run():

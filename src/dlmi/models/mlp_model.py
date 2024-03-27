@@ -24,9 +24,10 @@ class MLPModel(pl.LightningModule):
         self.val_acc_output     = []
 
     def forward(self, x):
-        # print(x.shape)
-        # print(x)
         return self.model(x)
+
+    def predict(self, cnn_features, mlp_features, batch_size, augment=False):
+        return self.forward(mlp_features)
 
     def training_step(self, batch, batch_idx):     
         all_features, labels = batch
