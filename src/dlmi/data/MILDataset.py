@@ -26,7 +26,7 @@ class MILDataset(Dataset, CustomDataset):
 
         self.data['GENDER'] = self.data['GENDER'].map({'M': 0, 'F': 1}) # 1 nan value
         self.data.loc[self.data.GENDER.isna(), "GENDER"] = 0.5
-        self.data['DOB'] = (pd.to_datetime('2021-01-01') - pd.to_datetime(self.data['DOB'], format='mixed')).dt.days / (100*365) # scaling normalization
+        self.data['AGE'] = (pd.to_datetime('2021-01-01') - pd.to_datetime(self.data['DOB'], format='mixed')).dt.days / (100*365) # scaling normalization
         self.data['LYMPH_COUNT'] = self.data['LYMPH_COUNT'].astype(np.float32) / 200 # scaling normalization
 
         # print(self.data['GENDER'].isna().sum())
@@ -42,7 +42,7 @@ class MILDataset(Dataset, CustomDataset):
     def __getitem__(self, idx):
         cur_patient       = self.patients[idx]
         label             = self.data.loc[self.data['ID'] == cur_patient, 'LABEL'].values[0]
-        clinical_features = self.data.loc[self.data['ID'] == cur_patient, ['GENDER', 'LYMPH_COUNT']].values[0].astype(np.float32)
+        clinical_features = self.data.loc[self.data['ID'] == cur_patient, ['GENDER', 'AGE', 'LYMPH_COUNT']].values[0].astype(np.float32)
 
         if self.load_images:
             

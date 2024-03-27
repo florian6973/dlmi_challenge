@@ -51,7 +51,7 @@ class MOEModel(pl.LightningModule):
         # self.final_cnn = nn.Sequential(nn.Linear(512, 2), nn.LogSoftmax(dim=1))
 
         self.mlp = nn.Sequential(
-            nn.Linear(2, 10),
+            nn.Linear(3, 10),
             nn.ReLU(),
             nn.Linear(10, 2),
             nn.LogSoftmax(dim=1)
@@ -61,6 +61,7 @@ class MOEModel(pl.LightningModule):
         self.cfg = cfg
 
         self.train_steps_output = []
+        self.train_steps_output_mlp = []
         self.train_acc_output   = []
         self.val_steps_output   = []
         self.val_acc_output     = []
@@ -120,6 +121,7 @@ class MOEModel(pl.LightningModule):
         # loss  = self.criterion(preds[0], labels)
 
         self.train_steps_output.append(loss_cnn.detach().item())
+        self.train_steps_output_mlp.append(loss_mlp.detach().item())
         # print(loss)
         self.train_acc_output.append(
             [cnn_outputs.detach(), mlp_outputs.detach(), labels.detach()]
@@ -217,8 +219,9 @@ class MOEModel(pl.LightningModule):
         self.train_acc_output = []
         # log the training error to mlflow
         train_error = sum(self.train_steps_output) / len(self.train_steps_output)
+        train_error_mlp = sum(self.train_steps_output_mlp) / len(self.train_steps_output_mlp)
         mlflow.log_metric("train_error", train_error, step=self.current_epoch)
-        print(f"\nEpoch {self.current_epoch} train_error: {train_error:5g} - train_acc_cnn: {acc_cnn:5g} - train_acc_mlp: {acc_mlp:5g}")
+        print(f"\nEpoch {self.current_epoch} train_error: {train_error:5g} - train_error_mlp: {train_error_mlp:5g} - train_acc_cnn: {acc_cnn:5g} - train_acc_mlp: {acc_mlp:5g}")
         self.train_steps_output = []
 
     def on_validation_epoch_end(self):
