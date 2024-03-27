@@ -136,27 +136,17 @@ class MOEModel(pl.LightningModule):
             [cnn_outputs.detach(), mlp_outputs.detach(), final_outputs.detach(), labels.detach()]
         )
 
-    def infer(self, cnn_features, mlp_features, batch_size, augment=False):        
-        # print(cnn_features.shape)
-        # print(cnn_features)
+    def infer(self, cnn_features, mlp_features, batch_size, augment=False):
         cnn_features = cnn_features.view(-1, cnn_features.shape[-3], cnn_features.shape[-2], cnn_features.shape[-1])
         indices = torch.where(torch.sum(cnn_features, dim=(1, 2, 3)).long() == 0)[0]
-        # print(indices)
         mask = torch.ones(cnn_features.shape[0], dtype=torch.bool)
         mask[indices] = False
-        # print(mask)
         cnn_features = cnn_features[mask]
 
-        # augment = False
         if augment:
             cnn_features = self.transform(cnn_features)
-        
-        # print(cnn_features.shape)
-        # exit()
 
         pred_cnn, pred_mlp = self(cnn_features, mlp_features)
-        # print(pred_cnn.shape, pred_mlp.shape)
-        # print(pred_cnn, pred_mlp)
 
         # check if nan
         if torch.isnan(pred_cnn).any():
@@ -168,45 +158,32 @@ class MOEModel(pl.LightningModule):
             print(pred_mlp)
             exit()
 
-        # means = torch.zeros((batch_size, pred_cnn.shape[1]), requires_grad=True)
-
         means = []
-
-        # print(indices)
 
         last_label = 0
         i_means = 0
         idx_pred_cnn = 0
+        # replace this with RNN? that can learn an arbitrary number of vectors
         for i in range(indices.shape[0]):
             current_label = indices[i]
             if current_label - last_label > 1:
                 diff = current_label - last_label
-                # print("average from", last_label, "to", current_label, "diff", diff, "idx_pred_cnn", idx_pred_cnn)
-                # means[i_means] = torch.mean(pred_cnn[idx_pred_cnn:idx_pred_cnn+diff], dim=0)
                 means.append(torch.mean(pred_cnn[idx_pred_cnn:idx_pred_cnn+diff], dim=0))
                 i_means += 1
                 idx_pred_cnn += diff
 
             last_label = current_label
 
-        # print(means.shape)
-        # print(means)
-        # print(torch.isnan(means).any()) 
-
         means = torch.stack(means)
 
         pred_cnn = means.to(device=cnn_features.device, dtype=cnn_features.dtype)
-        # pred_cnn = self.classifier_cnn(pred_cnn)
 
         if torch.isnan(pred_cnn).any():
             print("Nan in pred_cnn")
             print(pred_cnn)
             exit()
 
-        # exit()
-
         pred_final = self.final_classifier(torch.cat([pred_cnn.clone().detach(), pred_mlp.clone().detach()], dim=1).float())
-        # print(pre_final)
 
         return pred_cnn, pred_mlp, pred_final
 
@@ -250,11 +227,8 @@ class MOEModel(pl.LightningModule):
             y_pre_total, labels_all, task='multiclass', num_classes=2, average='macro'
         )
 
-
-        # print(acc)
         mlflow.log_metric("train_acc", acc_final, step=self.current_epoch)
         self.train_acc_output = []
-        # log the training error to mlflow
         train_error = sum(self.train_steps_output) / len(self.train_steps_output)
         train_error_mlp = sum(self.train_steps_output_mlp) / len(self.train_steps_output_mlp)
         train_error_final = sum(self.train_steps_output_total) / len(self.train_steps_output_total)
@@ -305,21 +279,12 @@ class MOEModel(pl.LightningModule):
         optimizer_total.step()
 
     def configure_optimizers(self):
-
-        # if not self.cfg.train.freeze_cnn:
-        #     optimizer_cnn = hydra.utils.instantiate(
-        #         self.cfg.optimizer,
-        #         *[self.cnn.parameters()], 
-        #         **{"lr":self.cfg.train.lr}
-        #     )
-
         from itertools import chain
         optimizer_cnn = hydra.utils.instantiate(
             self.cfg.optimizer,
             *[chain(self.cnn.parameters(), self.classifier_cnn.parameters())],
             **{"lr":self.cfg.train.lr_cnn}
         )
-
 
         optimizer_mlp = hydra.utils.instantiate(
             self.cfg.optimizer,

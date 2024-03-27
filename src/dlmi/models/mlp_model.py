@@ -33,12 +33,9 @@ class MLPModel(pl.LightningModule):
         all_features, labels = batch
         mlp_features = all_features[1]
         preds = self.forward(mlp_features)
-        # print(preds.shape)
-        # print(preds)
         loss = self.criterion(preds, labels)
 
         self.train_steps_output.append(loss.item())
-        # print(loss)
         self.train_acc_output.append(
             [preds, labels]
         )
@@ -53,7 +50,6 @@ class MLPModel(pl.LightningModule):
         self.val_acc_output.append(
             [preds, labels]
         )
-        # print(loss)
 
         self.val_steps_output.append(loss.item())
         return loss
@@ -68,7 +64,7 @@ class MLPModel(pl.LightningModule):
         acc = torchmetrics.functional.classification.accuracy(
             y_pre_all, labels_all, task='multiclass', num_classes=2, average='macro'
         )
-        # print(acc)
+
         mlflow.log_metric("train_acc", acc, step=self.current_epoch)
         self.train_acc_output = []
         # log the training error to mlflow
@@ -84,7 +80,6 @@ class MLPModel(pl.LightningModule):
         acc = torchmetrics.functional.classification.accuracy(
             y_pre_all, labels_all, task='multiclass', num_classes=2, average='macro'
         )
-        # print(acc)
         mlflow.log_metric("val_acc", acc, step=self.current_epoch)
         self.val_acc_output = []
 
@@ -95,9 +90,6 @@ class MLPModel(pl.LightningModule):
         self.val_steps_output = []
 
     def configure_optimizers(self):
-        # optimizer = optim.Adam(self.parameters(), lr=1e-3)
-        # return optimizer
-        # return self.optimizer
         optimizer = hydra.utils.instantiate(
                     self.cfg.optimizer,
                     *[self.model.parameters()], 

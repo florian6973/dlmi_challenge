@@ -8,13 +8,13 @@ criterion:
 optimizer:
   _target_: torch.optim.Adam
 
-dataset_type: "MiniDataset"
+dataset_type: "MILDataset"
 
 # Training parameters
 train: 
   lr: 1e-2
-  batch_size : 300 #2 #30
-  num_epochs: 40
+  batch_size : 2 #300 #2 #30
+  num_epochs: 2 #40
   weight_decay: 0
 
 # Experiment parameters
@@ -23,6 +23,9 @@ exp:
   data_path: "/../../data/raw/raw/" 
   checkpoint: "models/linear"
   seed: 10
+  tune:
+    enabled: true
+    num_samples: 2
 
 # mlflow parameters
 mlflow:

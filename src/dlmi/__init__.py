@@ -24,7 +24,6 @@ import pytorch_lightning as pl
 
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-# from ray import train, tune
 import ray.tune as tune
 import ray.train as train
 from ray.air.integrations.mlflow import setup_mlflow
@@ -103,14 +102,9 @@ def launch(cfg: DictConfig):
         )
 
         if "tune" in cfg.exp.keys() and cfg.exp.tune.enabled:
-            model = tune_cfg(cfg, train_set, val_set)
+            model = tune_cfg(cfg, complete_train_set, train_set, val_set)
         else:
-            # model = train_dlmi(None, cfg, complete_train_set, train_set, val_set)
             model = train_dlmi(None, cfg, complete_train_set, train_set, val_set)
-
-
-        # save_model(working_dir + "/checkpoint.pt", model)
-        # logging.info(f"Checkpoint saved at {working_dir}")
 
         gc.collect()
         model = model.to(device)
@@ -160,11 +154,12 @@ def submit_final():
 
 def update_config(cfg, config):
     cfg.train.batch_size = config["batch_size"]
-    cfg.train.lr = config["lr"]
-    cfg.train.weight_decay = config["weight_decay"]
-    cfg.train.num_epochs = config["num_epochs"]
-    cfg.exp.seed = config["seed"]
+    # cfg.train.lr = config["lr"]
+    # cfg.train.weight_decay = config["weight_decay"]
+    # cfg.train.num_epochs = config["num_epochs"]
+    # cfg.exp.seed = config["seed"]
     return cfg
+
 
 def train_dlmi(config, cfg, complete_train_set, train_set, val_set):
     metrics = ["val_negacc"]
@@ -180,11 +175,6 @@ def train_dlmi(config, cfg, complete_train_set, train_set, val_set):
 
         batch_size = cfg.train.batch_size
         print("Batch size: ", batch_size)
-
-        # basic_model = BasicModel(model, criterion, optimizer)
-        # basic_model   = MILModel(model, criterion, optimizer)
-        # train_dataset = DataLoader(train_set, batch_size, shuffle=True, num_workers=0)
-        # val_dataset   = DataLoader(val_set,   batch_size, shuffle=False, num_workers=0)
 
         if cfg.dataset_type == "MiniDataset":
             s_train = Sampler(complete_train_set.train_classes, class_per_batch=1, batch_size=batch_size)
@@ -213,19 +203,19 @@ def train_dlmi(config, cfg, complete_train_set, train_set, val_set):
         return model
 
 
-def tune_cfg(cfg, train_set, val_set):
+def tune_cfg(cfg, complete_train_set, train_set, val_set):
     config = {
-        # "lr": tune.loguniform(1e-4, 1e-1),
         "batch_size": tune.choice([1, 5]),
-        "lr": tune.loguniform(1e-4, 1e-1),
-        "weight_decay": tune.loguniform(1e-4, 1e-1),
-        "num_epochs": tune.choice([10, 20, 30, 40]),
-        "seed": tune.choice([42, 43, 44, 45, 46, 47, 48, 49, 50]),
+        # "lr": tune.loguniform(1e-4, 1e-1),
+        # "weight_decay": tune.loguniform(1e-4, 1e-1),
+        # "num_epochs": tune.choice([10, 20, 30, 40]),
+        # "seed": tune.choice([42, 43, 44, 45, 46, 47, 48, 49, 50]),
     }
 
     trainable = tune.with_parameters(
         train_dlmi,
         cfg=cfg,
+        complete_train_set=complete_train_set,
         train_set=train_set,
         val_set=val_set,
     )
@@ -253,52 +243,24 @@ def tune_cfg(cfg, train_set, val_set):
     return model
 
     
-# https://medium.com/@soumensardarintmain/manage-cuda-cores-ultimate-memory-management-strategy-with-pytorch-2bed30cab1#:~:text=The%20recommended%20way%20is%20to,first%20and%20then%20call%20torch.
 def run_infer(dataset, main_dataset, model, name, device, mask=None, fold=0):
     preds = []
-    # model = model.to(device)
     model.eval()
     with torch.no_grad():
         for batch in tqdm(dataset, desc=f"Predicting {name} set"):
             torch.cuda.empty_cache()
             images, labels = batch
-            # print(images[0].shape)
-            # images[1] = images[1].to(device)
-            # print(images[1].shape)
 
-            # mlp
-            # y_pre = model(images[1].to(device))
-
-            # moe
             y_pre = model.predict(images[0].unsqueeze(1).to(device), images[1].to(device), images[0].shape[0])
 
-            # print(y_pre)
-            # print(labels)
             selected_class = torch.argmax(y_pre, dim=1)
-            # print(selected_class)
             preds.append(selected_class)
         
         preds = torch.cat(preds)
         bac = main_dataset.get_patient_labels(preds, mask, name, fold)
 
         return bac
-    
 
-    # TODO Maybe improve the logging of the training loop ?
-    # TODO Vizualisation methods ?
-
-# def pred():
-#     import argparse
-#     import os
-
-#     args = argparse.ArgumentParser()
-#     args.add_argument("dataset", help="Dataset type (train or test)")
-#     args = args.parse_args()
-#     train_set_path = os.getcwd() + "/data/raw"
-    
-#     print("Working dir: ", working_dir)
-#     complete_train_set = PatientDataset(train_set_path)
-    
 
 
 if __name__ == "__main__":

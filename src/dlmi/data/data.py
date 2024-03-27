@@ -28,7 +28,7 @@ def load_dataset(dataset: CustomDataset, train_proportion=0.8):
     return train_set, val_set, mask_train
 
 def load_kfolds(dataset: CustomDataset, k=5):
-    skf = StratifiedKFold(n_splits=k)
+    skf = StratifiedKFold(n_splits=k, shuffle=True)
     # skf.get_n_splits(dataset.patients, dataset.data['LABEL'].values)
     # print(skf)
     # exit()
