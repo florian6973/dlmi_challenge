@@ -8,10 +8,12 @@ criterion:
 optimizer:
   _target_: torch.optim.Adam
 
+# dataset_type: "MiniDataset"
+
 # Training parameters
 train: 
   lr: 1e-2
-  batch_size : 3
+  batch_size : 1
   num_epochs: 50
   weight_decay: 0 #0.0005
   beta1: 0.9

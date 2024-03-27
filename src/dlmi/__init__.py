@@ -9,10 +9,9 @@ import hydra
 import mlflow
 import torch
 from dlmi.data.data import load_dataset
-from dlmi.models.models import save_model
-from dlmi.data.patientDataset import PatientDataset
 from dlmi.data.MILDataset import MILDataset
 from dlmi.utils.mlflow import log_params_from_omegaconf_dict
+from dlmi.data.MiniDataset import MiniDataset, Sampler
 
 from hydra import utils
 from omegaconf import DictConfig
@@ -20,11 +19,6 @@ from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 
 from pytorch_lightning.callbacks import ModelCheckpoint
-
-import random
-
-from dlmi.models.train_model import BasicModel, MILModel
-
 
 # from ray import train, tune
 import ray.tune as tune
@@ -52,14 +46,28 @@ def launch(cfg: DictConfig):
     
     print("Working dir: ", working_dir)
     # complete_train_set = PatientDataset(train_set_path)
-    complete_train_set = MILDataset(train_set_path)
+    
+    batch_size = cfg.train.batch_size
+    
+    dataset_type = cfg.get('dataset_type', "MILDataset").lower()
+    
+    if dataset_type == "MILDataset".lower():
+        complete_train_set = MILDataset(train_set_path, device)
+        sampler = None
+
+    elif dataset_type == "MiniDataset".lower():
+        complete_train_set = MiniDataset(train_set_path)
+        sampler = Sampler(complete_train_set.classes, class_per_batch=1, batch_size=batch_size)
+
+    else:
+        raise NotImplementedError("dataset_type must be in [ MILDataset, Minidataset ]")
+    
     print("Train set loaded")
     train_set, val_set, mask_train = load_dataset(complete_train_set)
 
     # mlflow.set_tracking_uri("file://" + utils.get_original_cwd() + "/mlruns")
     mlflow.set_tracking_uri(uri="http://127.0.0.1:5001")
     mlflow.set_experiment(cfg.mlflow.runname)
-    batch_size = cfg.train.batch_size
     # start new run
     # with mlflow.start_run():
     #     log_params_from_omegaconf_dict(cfg) 
@@ -92,7 +100,7 @@ def launch(cfg: DictConfig):
     if "tune" in cfg.exp.keys() and cfg.exp.tune.enabled:
         model = tune_cfg(cfg, train_set, val_set)
     else:
-        model = train_dlmi(None, cfg, train_set, val_set)
+        model = train_dlmi(None, cfg, train_set, val_set, sampler)
 
     # save_model(working_dir + "/checkpoint.pt", model)
     # logging.info(f"Checkpoint saved at {working_dir}")
@@ -115,7 +123,7 @@ def update_config(cfg, config):
     cfg.exp.seed = config["seed"]
     return cfg
 
-def train_dlmi(config, cfg, train_set, val_set):
+def train_dlmi(config, cfg, train_set, val_set, sampler=None):
     metrics = ["val_negacc"]
     tune_callback = TuneReportCheckpointCallback(metrics, on="validation_end")
     # mlflow.pytorch.autolog()
@@ -133,8 +141,13 @@ def train_dlmi(config, cfg, train_set, val_set):
 
         # basic_model = BasicModel(model, criterion, optimizer)
         # basic_model   = MILModel(model, criterion, optimizer)
-        train_dataset = DataLoader(train_set, batch_size, shuffle=True, num_workers=0)
-        val_dataset   = DataLoader(val_set,   batch_size, shuffle=False, num_workers=0)
+        if sampler:
+            train_dataset = DataLoader(train_set, num_workers=0, batch_sampler=sampler)
+            val_dataset   = DataLoader(val_set,   num_workers=0, batch_sampler=sampler)
+        else:
+            train_dataset = DataLoader(train_set, batch_size, shuffle=True, num_workers=0)
+            val_dataset   = DataLoader(val_set,   batch_size, shuffle=False, num_workers=0)
+        
 
         checkpoint_callback = ModelCheckpoint(monitor="val_negacc")
 
