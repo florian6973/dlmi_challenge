@@ -10,7 +10,7 @@ class MLPModel(pl.LightningModule):
         super().__init__()
         self.cfg = cfg
         self.model     = nn.Sequential(
-            nn.Linear(2, 10),
+            nn.Linear(3, 10),
             nn.ReLU(),
             nn.Linear(10, 2),
             nn.LogSoftmax(dim=1)

@@ -10,6 +10,8 @@ import os
 import torch.nn as nn
 import random
 
+from tqdm import tqdm
+
 class Sampler():
     def __init__(self, classes, class_per_batch, batch_size):
         self.classes = classes
@@ -58,6 +60,8 @@ class MiniDataset(Dataset, CustomDataset):
         # exit()
 
         self.images = {}
+        for path in tqdm(self.image_paths):
+            self.images[path] = read_image(path).to(self.device)
         self.build_classes()
 
 
@@ -97,6 +101,7 @@ class MiniDataset(Dataset, CustomDataset):
         
         path = self.image_paths[idx]
         if path not in self.images:
+            print("Reading image", path)
             self.images[path] = read_image(path).to(self.device)
         cur_patient = self.get_patient(path)
         current_image = self.images[path]

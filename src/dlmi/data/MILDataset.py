@@ -36,6 +36,8 @@ class MILDataset(Dataset, CustomDataset):
         # exit()
 
         self.images = {}
+        for path in tqdm(self.image_paths):
+            self.images[path] = read_image(path).to(self.device)
 
     def __len__(self):
         return len(self.patients)

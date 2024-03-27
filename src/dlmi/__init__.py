@@ -31,6 +31,8 @@ from ray.tune.schedulers import ASHAScheduler
 
 from tqdm import tqdm
 
+import random
+
 def run_local_mlflow():
     subprocess.run('mlflow server --host 127.0.0.1 --port 5001'.split())
 
@@ -44,6 +46,9 @@ def launch(cfg: DictConfig):
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # set_seed(cfg.exp.seed)
+    random.seed(cfg.exp.seed)
+    np.random.seed(cfg.exp.seed)
+    torch.manual_seed(cfg.exp.seed)
     
     print("Working dir: ", working_dir)
     # complete_train_set = PatientDataset(train_set_path)
@@ -105,11 +110,12 @@ def launch(cfg: DictConfig):
 
     gc.collect()
     model = model.to(device)
-    complete_test_set = MILDataset(train_set_path, split="test")
+    complete_test_set = MILDataset(train_set_path, split="test", device=device)
     test_dataset = DataLoader(complete_test_set, 1, shuffle=False, num_workers=0)
     # device = "cpu"
     run_infer(test_dataset, complete_test_set, model, "test", device, None)
 
+    batch_size = cfg.train.batch_size
     val_dataset   = DataLoader(val_set,   batch_size, shuffle=False, num_workers=0)
     run_infer(val_dataset, complete_train_set, model, "val", device, (~mask_train))
 
@@ -221,8 +227,11 @@ def run_infer(dataset, main_dataset, model, name, device, mask=None):
             # print(images[0].shape)
             # images[1] = images[1].to(device)
             # print(images[1].shape)
-            # y_pre = model(images[1])
-            y_pre = model.infer(images[0].unsqueeze(1).to(device), images[1].to(device), images[0].shape[0])
+
+            y_pre = model(images[1].to(device))
+
+            # y_pre = model.infer(images[0].unsqueeze(1).to(device), images[1].to(device), images[0].shape[0])
+
             # print(y_pre)
             # print(labels)
             selected_class = torch.argmax(y_pre, dim=1)

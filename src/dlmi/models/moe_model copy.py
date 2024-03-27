@@ -19,15 +19,16 @@ class MOEModel(pl.LightningModule):
         self.cnn = torchvision.models.resnet34(weights="DEFAULT")
         self.cnn.fc = nn.Identity()
 
-        if cfg.get('train', {}).get('freeze_cnn', False):
-            for param in self.cnn.parameters():
+        # if cfg.get('train', {}).get('freeze_cnn', False):
+        #     for param in self.cnn.parameters():
+        #         param.requires_grad = False
+        for param in self.cnn.parameters():
                 param.requires_grad = False
-        
 
         self.classifier_cnn = nn.Sequential(
-            nn.Linear(512, 64),
+            nn.Linear(512, 256), 
             nn.ReLU(),
-            nn.Linear(64, 2), 
+            nn.Linear(256, 2),
             nn.LogSoftmax(dim=1)
         )
 
@@ -56,18 +57,17 @@ class MOEModel(pl.LightningModule):
             nn.Linear(3, 10),
             nn.ReLU(),
             nn.Linear(10, 2),
-            # nn.LogSoftmax(dim=1)
             nn.LogSoftmax(dim=1)
         )
 
-        self.criterion = hydra.utils.instantiate(cfg.criterion)
+        self.criterion_cnn = hydra.utils.instantiate(cfg.criterion)
+        self.criterion_mlp = hydra.utils.instantiate(cfg.criterion)
         self.cfg = cfg
 
         self.train_steps_output = []
         self.train_steps_output_mlp = []
         self.train_acc_output   = []
         self.val_steps_output   = []
-        self.val_steps_output_mlp   = []
         self.val_acc_output     = []
 
         # Define the augmentation pipeline
@@ -80,7 +80,7 @@ class MOEModel(pl.LightningModule):
             transforms.RandomRotation(180),
             transforms.RandomHorizontalFlip(),
             transforms.RandomVerticalFlip(),
-            # transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
         # self.transform_normalize = transforms.Compose([
 
@@ -96,108 +96,112 @@ class MOEModel(pl.LightningModule):
             # Disable backward pass for SWA until the bug is fixed in lightning (https://github.com/Lightning-AI/lightning/issues/17245)
             # self.automatic_optimization = False
 
-    def forward(self, x_cnn, x_mlp):        
+    def forward(self, x_cnn, x_mlp):
+        
         return self.cnn(x_cnn), self.mlp(x_mlp)
 
-    def training_step(self, batch, batch_idx):   
+    def training_step(self, batch, batch_idx):    
+        
         torch.cuda.empty_cache()
         all_features, labels = batch
         mlp_features = all_features[1]
         cnn_features = all_features[0]
 
+        # print(cnn_features.shape)
+        # exit()
+        # for i in range(len(cnn_features)):
+        #     cnn_features[i] = self.forward(cnn_features[i])
+        # preds = self.forward(mlp_features)
+        # print(preds.shape)
+        # print(preds)
+
         cnn_outputs, mlp_outputs = self.infer(cnn_features, mlp_features, cnn_features.shape[0], True)
-        loss_cnn = self.criterion(cnn_outputs, labels)
-        loss_mlp = self.criterion(mlp_outputs, labels)
+        loss_cnn = self.criterion_cnn(cnn_outputs, labels)
+        loss_mlp = self.criterion_mlp(mlp_outputs, labels)
         
-        self.update_optimizers(loss_cnn, loss_mlp)
+        # self.update_optimizers(loss_cnn, loss_mlp)
+
+        # preds = self.infer(cnn_features, mlp_features, cnn_features.shape[0], True)
+        # loss  = self.criterion(preds[0], labels)
 
         self.train_steps_output.append(loss_cnn.detach().item())
         self.train_steps_output_mlp.append(loss_mlp.detach().item())
+        # print(loss)
         self.train_acc_output.append(
             [cnn_outputs.detach(), mlp_outputs.detach(), labels.detach()]
         )
+        return loss_cnn
 
-    def infer(self, cnn_features, mlp_features, batch_size, augment=False):        
-        # print(cnn_features.shape)
-        # print(cnn_features)
-        cnn_features = cnn_features.view(-1, cnn_features.shape[-3], cnn_features.shape[-2], cnn_features.shape[-1])
-        indices = torch.where(torch.sum(cnn_features, dim=(1, 2, 3)).long() == 0)[0]
-        # print(indices)
-        mask = torch.ones(cnn_features.shape[0], dtype=torch.bool)
-        mask[indices] = False
-        # print(mask)
-        cnn_features = cnn_features[mask]
-
-        augment = False
-        if augment:
-            cnn_features = self.transform(cnn_features)
+    def infer(self, cnn_features, mlp_features, batch_size, augment=False):
         
-        # print(cnn_features.shape)
-        # exit()
+        cnn_features = cnn_features.view(-1, cnn_features.shape[-3], cnn_features.shape[-2], cnn_features.shape[-1])
+        # # print(cnn_features.shape)
+        # # get indices where last three dimensions are zero
+        indices = torch.where(torch.sum(cnn_features, dim=(1, 2, 3)) == 0)[0]
+        # # indices = torch.unique(indices)
+        mask = torch.ones(cnn_features.shape[0], dtype=torch.bool)
 
+
+        # # Apply the transform to an image
+        cnn_features = cnn_features[mask]
+        # # features = self.transform_normalize(features)
+
+        if False:#augment:
+            cnn_features = self.transform(cnn_features)
+
+        # print(indices)
         pred_cnn, pred_mlp = self(cnn_features, mlp_features)
-        # print(pred_cnn.shape, pred_mlp.shape)
-        # print(pred_cnn, pred_mlp)
-
-        # check if nan
-        if torch.isnan(pred_cnn).any():
-            print("Nan in pred_cnn")
-            print(pred_cnn)
-            exit()
-        if torch.isnan(pred_mlp).any():
-            print("Nan in pred_mlp")
-            print(pred_mlp)
-            exit()
-
         means = torch.zeros((batch_size, pred_cnn.shape[1]))
+        # mins = torch.zeros((batch_size, pred_cnn.shape[1]))
+        # maxs = torch.zeros((batch_size, pred_cnn.shape[1]))
+        # print(result.shape)
 
         last_label = 0
         i_means = 0
-        idx_pred_cnn = 0
         for i in range(indices.shape[0]):
             current_label = indices[i]
             if current_label - last_label > 1:
-                diff = current_label - last_label
-                # print("average from", last_label, "to", current_label, "diff", diff, "idx_pred_cnn", idx_pred_cnn)
-                means[i_means] = torch.mean(pred_cnn[idx_pred_cnn:idx_pred_cnn+diff], dim=0)
+                means[i_means] = torch.mean(pred_cnn[last_label:current_label], dim=0)
+                # mins[i_means] = torch.min(pred_cnn[last_label:current_label], dim=0).values
+                # maxs[i_means] = torch.max(pred_cnn[last_label:current_label], dim=0).values
+                # print(i_means, last_label, current_label)
                 i_means += 1
-                idx_pred_cnn += diff
-
             last_label = current_label
+
 
         # print(means.shape)
         # print(means)
-        # print(torch.isnan(means).any()) 
-
-
+        # result = torch.concat([means, mins, maxs], dim=1).to(device=cnn_features.device, dtype=cnn_features.dtype)
         pred_cnn = means.to(device=cnn_features.device, dtype=cnn_features.dtype)
+        # print(result.shape)
         pred_cnn = self.classifier_cnn(pred_cnn)
 
-        if torch.isnan(pred_cnn).any():
-            print("Nan in pred_cnn")
-            print(pred_cnn)
-            exit()
-
-        # exit()
+        # result_final = self.final_cnn(pred_cnn)
+        # pred_mlp = mlp_features
+        # mlp_preds = self.mlp(torch.concat([result_final, mlp_features], dim=1))
+        # print(result_final.shape)
+        # print(result_final)
 
         return pred_cnn, pred_mlp
 
-    def validation_step(self, batch, batch_idx):      
+    def validation_step(self, batch, batch_idx):   
+        # print("Val", torch.cuda.memory_allocated())      
         all_features, labels = batch
         mlp_features = all_features[1]
         cnn_features = all_features[0]
 
         pred_cnn, pred_mlp = self.infer(cnn_features, mlp_features, cnn_features.shape[0])
 
-        loss_cnn = self.criterion(pred_cnn, labels)
-        loss_mlp = self.criterion(pred_mlp, labels)
+        loss_cnn = self.criterion_cnn(pred_cnn, labels)
+        loss_mlp = self.criterion_mlp(pred_mlp, labels)
 
         self.val_acc_output.append(
             [pred_cnn.detach(), pred_mlp.detach(), labels.detach()]
         )
 
         self.val_steps_output.append(loss_cnn.item())
-        self.val_steps_output_mlp.append(loss_mlp.item())
+
+        return loss_cnn, loss_mlp
 
     def stats(self, preds_list, labels_list, cat="val"):
         pass
@@ -240,22 +244,22 @@ class MOEModel(pl.LightningModule):
         self.val_acc_output = []
 
         val_error = sum(self.val_steps_output) / len(self.val_steps_output)
-        val_error_mlp = sum(self.val_steps_output_mlp) / len(self.val_steps_output_mlp)
         self.log("val_negacc", -acc_cnn)
         mlflow.log_metric("val_error", val_error, step=self.current_epoch)
-        print(f"\nEpoch {self.current_epoch} val_error: {val_error:5g} - val_error_mlp: {val_error_mlp:5g} - val_acc_cnn: {acc_cnn:5g} - val_acc_mlp: {acc_mlp:5g}")
+        print(f"\nEpoch {self.current_epoch} val_error: {val_error:5g} - val_acc_cnn: {acc_cnn:5g} - val_acc_mlp: {acc_mlp:5g}")
         self.val_steps_output = []
     
-    def update_optimizers(self, loss_cnn, loss_mlp):
-        optimizer_cnn, optimizer_mlp = self.optimizers()
-
-        optimizer_cnn.zero_grad()
-        self.manual_backward(loss_cnn)
-        optimizer_cnn.step()
+    # def update_optimizers(self, loss_cnn, loss_mlp):
         
-        optimizer_mlp.zero_grad()
-        self.manual_backward(loss_mlp)
-        optimizer_mlp.step()
+    #     self.optimizer_cnn.zero_grad()
+    #     self.manual_backward(loss_cnn)
+    #     self.optimizer_cnn.step()
+        
+    #     self.optimizer_mlp.zero_grad()
+    #     self.manual_backward(loss_mlp)
+    #     self.optimizer_mlp.step()
+
+    #     return [self.optimizer_cnn, self.optimizer_mlp]
 
     def configure_optimizers(self):
 
@@ -265,18 +269,21 @@ class MOEModel(pl.LightningModule):
         #         *[self.cnn.parameters()], 
         #         **{"lr":self.cfg.train.lr}
         #     )
+        # from itertools import chain
+        # self.optimizer_cnn = hydra.utils.instantiate(
+        #     self.cfg.optimizer,
+        #     *[chain(self.classifier_cnn.parameters(), self.cnn.parameters())], 
+        #     **{"lr":0.00001}#self.cfg.train.lr}
+        # )
 
-        optimizer_cnn = hydra.utils.instantiate(
-            self.cfg.optimizer,
-            *[self.classifier_cnn.parameters()], 
-            **{"lr":1}#self.cfg.train.lr}
-        )
 
-
-        optimizer_mlp = hydra.utils.instantiate(
+        self.optimizer_mlp = hydra.utils.instantiate(
             self.cfg.optimizer,
             *[self.mlp.parameters()], 
             **{"lr":0.01}#self.cfg.train.lr}
         )
 
-        return [optimizer_cnn, optimizer_mlp]
+        
+        # return []
+        # return [self.optimizer_cnn, self.optimizer_mlp]
+        return self.optimizer_mlp

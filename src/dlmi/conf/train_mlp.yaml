@@ -8,17 +8,19 @@ criterion:
 optimizer:
   _target_: torch.optim.Adam
 
+dataset_type: "MiniDataset"
+
 # Training parameters
 train: 
   lr: 1e-2
-  batch_size : 10
-  num_epochs: 20
+  batch_size : 300 #2 #30
+  num_epochs: 40
   weight_decay: 0
 
 # Experiment parameters
 exp: 
   name: "Classification"
-  data_path: "/data/raw/" 
+  data_path: "/../../data/raw/raw/" 
   checkpoint: "models/linear"
   seed: 10
 
