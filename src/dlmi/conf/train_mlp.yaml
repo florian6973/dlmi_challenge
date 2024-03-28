@@ -20,12 +20,13 @@ train:
 # Experiment parameters
 exp: 
   name: "Classification"
-  data_path: "/../../data/raw/raw/" 
+  data_path: "/data/raw/" 
   checkpoint: "models/linear"
   seed: 10
   tune:
     enabled: true
     num_samples: 2
+  augment: true
 
 # mlflow parameters
 mlflow:

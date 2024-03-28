@@ -17,17 +17,24 @@ class MOEModel(pl.LightningModule):
         
         self.cfg = cfg
 
-        self.cnn = torchvision.models.resnet34(weights="DEFAULT")
+        # self.cnn = torchvision.models.resnet34(weights="DEFAULT")
+        self.cnn = torchvision.models.vit_b_16(weights="DEFAULT")
 
         if cfg.get('train', {}).get('freeze_cnn', False):
             for param in self.cnn.parameters():
                 param.requires_grad = False
 
-        self.cnn.fc = nn.Sequential(
-            nn.Linear(self.cnn.fc.in_features, 512),
+        self.cnn.heads.head = nn.Sequential(
+            nn.Linear(self.cnn.heads.head.in_features, 512),
             nn.ReLU(),
             nn.Linear(512, 2),
         )
+
+        # self.cnn.fc = nn.Sequential(
+        #     nn.Linear(self.cnn.fc.in_features, 512),
+        #     nn.ReLU(),
+        #     nn.Linear(512, 2),
+        # )
         
 
         self.classifier_cnn = nn.Sequential(
@@ -44,32 +51,10 @@ class MOEModel(pl.LightningModule):
             nn.LogSoftmax(dim=1)
         )
 
-        # self.cnn.fc = nn.Linear(self.cnn.fc.in_features, 2)
-
-        # for param in self.cnn.fc.parameters():
-        #     param.requires_grad = True
-
-        # self.cnn = nn.Sequential(
-        #     nn.Conv2d(3, 6, 5, padding=1),
-        #     nn.MaxPool2d(2, 2, padding=1),
-        #     nn.Conv2d(6, 16, 5, padding=1),
-        #     nn.MaxPool2d(2, 2, padding=1),
-        #     nn.Flatten(),
-        #     nn.Linear(16 * 224//4 * 224//4, 512),
-        #     nn.ReLU(),
-        #     # nn.Linear(120, 84),
-        #     # nn.ReLU(),
-        #     # nn.Linear(84, 2),
-        #     # nn.LogSoftmax(dim=1)
-        # )
-
-        # self.final_cnn = nn.Sequential(nn.Linear(512, 2), nn.LogSoftmax(dim=1))
-
         self.mlp = nn.Sequential(
             nn.Linear(3, 10),
             nn.ReLU(),
             nn.Linear(10, 2),
-            # nn.LogSoftmax(dim=1)
             nn.LogSoftmax(dim=1)
         )
 
@@ -84,12 +69,6 @@ class MOEModel(pl.LightningModule):
         self.val_steps_output_mlp   = []
         self.val_steps_output_total   = []
         self.val_acc_output     = []
-
-        # Define the augmentation pipeline
-        # self.transform = transforms.Compose([
-        #     transforms.RandomRotation(90),  # Rotate the image by a random angle up to 30 degrees
-        #     transforms.ColorJitter(brightness=0.3) # Change the brightness by a random factor up to 0.3
-        # ])
         
         self.transform = transforms.Compose([
             transforms.RandomRotation(30),
@@ -97,10 +76,6 @@ class MOEModel(pl.LightningModule):
             transforms.RandomVerticalFlip(),
             # transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
-        # self.transform_normalize = transforms.Compose([
-
-        #     transforms.Normalize([209.15147887/255,  178.78958125/255,  179.65400146/255], [1.,1.,1.])
-        # ])
 
     def on_train_epoch_start(self) -> None:
         if self.current_epoch == self.trainer.max_epochs - 1:
@@ -110,6 +85,9 @@ class MOEModel(pl.LightningModule):
 
             # Disable backward pass for SWA until the bug is fixed in lightning (https://github.com/Lightning-AI/lightning/issues/17245)
             # self.automatic_optimization = False
+
+    def on_val_epoch_start(self) -> None:
+        torch.cuda.empty_cache()
 
     def forward(self, x_cnn, x_mlp):        
         return self.cnn(x_cnn), self.mlp(x_mlp)
@@ -151,12 +129,11 @@ class MOEModel(pl.LightningModule):
         mask[indices] = False
         cnn_features = cnn_features[mask]
 
-        if augment:
+        if self.cfg.get('train', {}).get('augment', False):
             cnn_features = self.transform(cnn_features)
 
         pred_cnn, pred_mlp = self(cnn_features, mlp_features)
 
-        # check if nan
         if torch.isnan(pred_cnn).any():
             print("Nan in pred_cnn")
             print(pred_cnn)

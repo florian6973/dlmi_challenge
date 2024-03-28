@@ -54,11 +54,6 @@ class MiniDataset(Dataset, CustomDataset):
         self.data['AGE'] = (pd.to_datetime('2021-01-01') - pd.to_datetime(self.data['DOB'], format='mixed')).dt.days / (100*365) # scaling normalization
         self.data['LYMPH_COUNT'] = self.data['LYMPH_COUNT'].astype(np.float32) / 200 # scaling normalization
 
-        # print(self.data['GENDER'].isna().sum())
-        # print(self.data['DOB'].isna().sum())
-        # print(self.data['LYMPH_COUNT'].isna().sum())
-        # exit()
-
         self.images = {}
         for path in tqdm(self.image_paths):
             self.images[path] = read_image(path).to(self.device)
@@ -111,10 +106,7 @@ class MiniDataset(Dataset, CustomDataset):
 
 
         features = current_image #torch.stack(patient_images)
-        # print("Returning patient images, age_count_features, label", torch.stack(patient_images).shape, age_count_features.shape, label)
-        # features = nn.functional.pad(features, (0, 0, 0, 0, 0, 0, 0, 250 - features.shape[0]))
-        # print("New shape", features.shape)
-        # print(age_count_features)
+        
         return [features, age_count_features], label
     
     def get_balanced_mask(self, train_size):
@@ -136,22 +128,12 @@ class MiniDataset(Dataset, CustomDataset):
     
     def get_indices_from_patient_mask(self, mask):
         return np.where(mask)[0]
-        # indices = []
-        # patients = []
-        # for i, p in enumerate(self.image_paths):
-        #     patient = os.path.basename(os.path.dirname(p))
-        #     patients.append(patient)
-        #     if mask[np.where(np.array(self.patients) == patient)[0]] and patient in self.patients:
-        #         indices.append(i)
-        # # print(patients)
-        # return indices
 
     def get_patient_labels(self, preds, mask=None, dataset="test", fold=0):
         patient_labels = []
         counters = {}
         k = 0
         for i, p in enumerate(self.patients):
-            # patient = os.path.basename(os.path.dirname(p))
             patient = p
             if mask is not None and not mask[np.where(np.array(self.patients) == patient)[0]]:
                 continue

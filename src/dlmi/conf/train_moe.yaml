@@ -15,7 +15,7 @@ train:
   lr_cnn: 1e-3
   lr_mlp: 1e-2
   lr_final: 1e-2
-  batch_size : 5 #10
+  batch_size : 3 #10
   num_epochs: 50
   weight_decay: 0 #0.0005
   beta1: 0.9
@@ -25,7 +25,7 @@ train:
 # Experiment parameters
 exp: 
   name: "Classification"
-  data_path: "/../../data/raw/raw" 
+  data_path: "/data/raw/" 
   checkpoint: "models/linear"
   seed: 10 # 15 0.82 #29 0.92
   tune:
