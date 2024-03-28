@@ -7,6 +7,7 @@ import hydra.utils
 import torchvision
 
 import torchvision.transforms as transforms    
+from torch.optim.lr_scheduler import StepLR
 
 class MOEModel(pl.LightningModule):
     def __init__(self, cfg):
@@ -91,7 +92,7 @@ class MOEModel(pl.LightningModule):
         # ])
         
         self.transform = transforms.Compose([
-            transforms.RandomRotation(180),
+            transforms.RandomRotation(30),
             transforms.RandomHorizontalFlip(),
             transforms.RandomVerticalFlip(),
             # transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
@@ -135,6 +136,13 @@ class MOEModel(pl.LightningModule):
         self.train_acc_output.append(
             [cnn_outputs.detach(), mlp_outputs.detach(), final_outputs.detach(), labels.detach()]
         )
+
+    def update_lr(self):
+        scheduler_cnn, scheduler_mlp, scheduler_total = self.lr_schedulers()
+
+        scheduler_cnn.step()
+        scheduler_mlp.step()
+        scheduler_total.step()
 
     def infer(self, cnn_features, mlp_features, batch_size, augment=False):
         cnn_features = cnn_features.view(-1, cnn_features.shape[-3], cnn_features.shape[-2], cnn_features.shape[-1])
@@ -236,6 +244,8 @@ class MOEModel(pl.LightningModule):
         print(f"\nEpoch {self.current_epoch} train_error_cnn: {train_error:5g} - train_error_mlp: {train_error_mlp:5g} - train_error_final: {train_error_final:5g} - train_acc_cnn: {acc_cnn:5g} - train_acc_mlp: {acc_mlp:5g} - train_acc_final: {acc_final:5g}")
         self.train_steps_output = []
 
+        self.update_lr()
+
     def on_validation_epoch_end(self):
         # log the validation error to mlflow
         y_pre_cnn  = torch.cat([x[0] for x in self.val_acc_output])
@@ -298,4 +308,10 @@ class MOEModel(pl.LightningModule):
             **{"lr":self.cfg.train.lr_final}
         )
 
-        return [optimizer_cnn, optimizer_mlp, optimizer_final]
+        scheduler_cnn = StepLR(optimizer_cnn, step_size=40, gamma=0.75)
+        scheduler_mlp = StepLR(optimizer_mlp, step_size=40, gamma=0.75)
+        scheduler_final = StepLR(optimizer_final, step_size=40, gamma=0.75)
+
+        return [optimizer_cnn, optimizer_mlp, optimizer_final], [scheduler_cnn, scheduler_mlp, scheduler_final]
+
+        # dual scheduler
