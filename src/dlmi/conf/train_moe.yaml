@@ -16,7 +16,7 @@ train:
   lr_mlp: 1e-2
   lr_final: 1e-2
   batch_size : 3 #10
-  num_epochs: 50
+  num_epochs: 20
   weight_decay: 0 #0.0005
   beta1: 0.9
   beta2: 0.999

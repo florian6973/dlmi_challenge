@@ -24,8 +24,10 @@ class MOEModel(pl.LightningModule):
             for param in self.cnn.parameters():
                 param.requires_grad = False
 
-        self.cnn.heads.head = nn.Sequential(
-            nn.Linear(self.cnn.heads.head.in_features, 512),
+        self.cnn.fc = nn.Sequential(
+        #self.cnn.heads.head = nn.Sequential(
+            # nn.Linear(self.cnn.heads.head.in_features, 512),
+            nn.Linear(self.cnn.fc.in_features, 512),
             nn.ReLU(),
             nn.Linear(512, 2),
             nn.LogSoftmax(dim=1)
@@ -156,6 +158,7 @@ class MOEModel(pl.LightningModule):
             exit()
 
         pred_final = self.final_classifier(torch.cat([pred_cnn.clone().detach(), pred_mlp.clone().detach()], dim=1).float())
+        pred_final = pred_cnn
 
         return pred_cnn, pred_mlp, pred_final
 
