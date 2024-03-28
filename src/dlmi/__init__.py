@@ -60,36 +60,8 @@ def launch(cfg: DictConfig):
         raise ValueError("Dataset type not supported, must be MiniDataset or MILDataset")
 
 
-    # mlflow.set_tracking_uri("file://" + utils.get_original_cwd() + "/mlruns")
     mlflow.set_tracking_uri(uri="http://127.0.0.1:5001")
     mlflow.set_experiment(cfg.mlflow.runname)
-    # start new run
-    # with mlflow.start_run():
-    #     log_params_from_omegaconf_dict(cfg) 
-        
-    #     model = hydra.utils.instantiate(cfg.model, cfg)
-
-    #     batch_size = cfg.train.batch_size
-
-    #     # basic_model = BasicModel(model, criterion, optimizer)
-    #     # basic_model   = MILModel(model, criterion, optimizer)
-    #     train_dataset = DataLoader(train_set, batch_size, shuffle=True, num_workers=0)
-    #     val_dataset   = DataLoader(val_set,   batch_size, shuffle=False, num_workers=0)
-
-    #     checkpoint_callback = ModelCheckpoint(monitor="val_negacc")
-
-    #     trainer = pl.Trainer(
-    #         max_epochs=cfg.train.num_epochs,
-    #         accelerator="gpu",
-    #         precision=16,
-    #         log_every_n_steps=10,
-    #         callbacks=[checkpoint_callback]
-    #     )
-    #     trainer.fit(model, train_dataset, val_dataset)
-
-    #     model.load_state_dict(torch.load(checkpoint_callback.best_model_path)["state_dict"])
-
-        # train(cfg.train.num_epochs, cfg.train.batch_size, criterion, optimizer, model, train_set)
 
     val_accs = []
     for i, one_set in enumerate(sets):
@@ -110,7 +82,7 @@ def launch(cfg: DictConfig):
         model = model.to(device)
         complete_test_set = MILDataset(train_set_path, split="test", device=device)
         test_dataset = DataLoader(complete_test_set, 1, shuffle=False, num_workers=0)
-        # device = "cpu"
+
         run_infer(test_dataset, complete_test_set, model, "test", device, None, i)
 
         batch_size = cfg.train.batch_size
