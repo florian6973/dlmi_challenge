@@ -16,17 +16,24 @@ class MOEModel(pl.LightningModule):
         
         self.cfg = cfg
 
-        self.cnn = torchvision.models.resnet34(weights="DEFAULT")
+        # self.cnn = torchvision.models.resnet34(weights="DEFAULT")
+        self.cnn = torchvision.models.vit_b_16(weights="DEFAULT")
 
         if cfg.get('train', {}).get('freeze_cnn', False):
             for param in self.cnn.parameters():
                 param.requires_grad = False
 
-        self.cnn.fc = nn.Sequential(
-            nn.Linear(self.cnn.fc.in_features, 512),
+        self.cnn.heads.head = nn.Sequential(
+            nn.Linear(self.cnn.heads.head.in_features, 512),
             nn.ReLU(),
             nn.Linear(512, 2),
         )
+
+        # self.cnn.fc = nn.Sequential(
+        #     nn.Linear(self.cnn.fc.in_features, 512),
+        #     nn.ReLU(),
+        #     nn.Linear(512, 2),
+        # )
         
 
         self.classifier_cnn = nn.Sequential(
@@ -77,6 +84,9 @@ class MOEModel(pl.LightningModule):
 
             # Disable backward pass for SWA until the bug is fixed in lightning (https://github.com/Lightning-AI/lightning/issues/17245)
             # self.automatic_optimization = False
+
+    def on_val_epoch_start(self) -> None:
+        torch.cuda.empty_cache()
 
     def forward(self, x_cnn, x_mlp):        
         return self.cnn(x_cnn), self.mlp(x_mlp)
