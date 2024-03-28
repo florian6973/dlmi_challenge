@@ -30,10 +30,6 @@ class MILDataset(Dataset, CustomDataset):
         self.data['AGE'] = (pd.to_datetime('2021-01-01') - pd.to_datetime(self.data['DOB'], format='mixed')).dt.days / (100*365) # scaling normalization
         self.data['LYMPH_COUNT'] = self.data['LYMPH_COUNT'].astype(np.float32) / 200 # scaling normalization
 
-        # print(self.data['GENDER'].isna().sum())
-        # print(self.data['DOB'].isna().sum())
-        # print(self.data['LYMPH_COUNT'].isna().sum())
-        # exit()
 
         self.images = {}
         # for path in tqdm(self.image_paths):
@@ -59,16 +55,13 @@ class MILDataset(Dataset, CustomDataset):
         image_features = torch.stack(patient_images)
         image_features = image_features[:300]
         
-        # print(image_features.shape)
         image_features = nn.functional.pad(image_features, (0, 0, 0, 0, 0, 0, 0, 301 - image_features.shape[0]))
 
-        # print("New shape", features.shape)
         return [image_features, clinical_features], label
     
     def get_balanced_mask(self, train_size):
         patients_labels = self.data.loc[self.data['ID'].isin(self.patients), 'LABEL']
 
-        # sklearn balanced split
         from sklearn.model_selection import train_test_split
 
         train_patients, _ = train_test_split(self.patients, stratify=patients_labels, train_size=train_size)
@@ -84,22 +77,12 @@ class MILDataset(Dataset, CustomDataset):
     
     def get_indices_from_patient_mask(self, mask):
         return np.where(mask)[0]
-        # indices = []
-        # patients = []
-        # for i, p in enumerate(self.image_paths):
-        #     patient = os.path.basename(os.path.dirname(p))
-        #     patients.append(patient)
-        #     if mask[np.where(np.array(self.patients) == patient)[0]] and patient in self.patients:
-        #         indices.append(i)
-        # # print(patients)
-        # return indices
 
     def get_patient_labels(self, preds, mask=None, dataset="test", fold=0):
         patient_labels = []
         counters = {}
         k = 0
         for i, p in enumerate(self.patients):
-            # patient = os.path.basename(os.path.dirname(p))
             patient = p
             if mask is not None and not mask[np.where(np.array(self.patients) == patient)[0]]:
                 continue

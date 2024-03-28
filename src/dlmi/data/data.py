@@ -6,22 +6,19 @@ import numpy as np
 from sklearn.model_selection import StratifiedKFold
 
 def load_dataset(dataset: CustomDataset, train_proportion=0.8):
-    # generator = torch.Generator()
-    # generator.manual_seed(seed)
 
     train_size = int(train_proportion * len(dataset.patients))
     val_size   = len(dataset.patients) - train_size
 
     # train_set, val_set = random_split(dataset, [train_size, val_size], generator=generator)
     mask_train = dataset.get_balanced_mask(train_size)
-    # print(mask_train)
 
     subset_train_indices = dataset.get_indices_from_patient_mask(mask_train)
-    # print(subset_train_indices)
+    
     train_set = Subset(dataset, subset_train_indices)
 
     subset_val_indices = dataset.get_indices_from_patient_mask(~mask_train)
-    # print(subset_val_indices)
+    
     val_set = Subset(dataset, subset_val_indices)
 
 
@@ -29,9 +26,7 @@ def load_dataset(dataset: CustomDataset, train_proportion=0.8):
 
 def load_kfolds(dataset: CustomDataset, k=5):
     skf = StratifiedKFold(n_splits=k, shuffle=True)
-    # skf.get_n_splits(dataset.patients, dataset.data['LABEL'].values)
-    # print(skf)
-    # exit()
+    
     X = dataset.patients
     y = dataset.data['LABEL'].values
     sets = []
