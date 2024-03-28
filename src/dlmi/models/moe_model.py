@@ -28,22 +28,9 @@ class MOEModel(pl.LightningModule):
             nn.Linear(self.cnn.heads.head.in_features, 512),
             nn.ReLU(),
             nn.Linear(512, 2),
-        )
-
-        # self.cnn.fc = nn.Sequential(
-        #     nn.Linear(self.cnn.fc.in_features, 512),
-        #     nn.ReLU(),
-        #     nn.Linear(512, 2),
-        # )
-        
-
-        self.classifier_cnn = nn.Sequential(
-            nn.Linear(512, 64),
-            nn.ReLU(),
-            nn.Linear(64, 2), 
             nn.LogSoftmax(dim=1)
         )
-
+       
         self.final_classifier = nn.Sequential(
             nn.Linear(4, 10),
             nn.ReLU(),
@@ -269,20 +256,20 @@ class MOEModel(pl.LightningModule):
         from itertools import chain
         optimizer_cnn = hydra.utils.instantiate(
             self.cfg.optimizer,
-            *[chain(self.cnn.parameters(), self.classifier_cnn.parameters())],
-            **{"lr":self.cfg.train.lr_cnn}
+            *[self.cnn.parameters()],
+            **{"lr":self.cfg.train.lr_cnn, "weight_decay":self.cfg.train.weight_decay}
         )
 
         optimizer_mlp = hydra.utils.instantiate(
             self.cfg.optimizer,
             *[self.mlp.parameters()], 
-            **{"lr":self.cfg.train.lr_mlp}
+            **{"lr":self.cfg.train.lr_mlp, "weight_decay":self.cfg.train.weight_decay}
         )
 
         optimizer_final = hydra.utils.instantiate(
             self.cfg.optimizer,
             *[self.final_classifier.parameters()], 
-            **{"lr":self.cfg.train.lr_final}
+            **{"lr":self.cfg.train.lr_final, "weight_decay":self.cfg.train.weight_decay}
         )
 
         scheduler_cnn = StepLR(optimizer_cnn, step_size=40, gamma=0.75)
@@ -292,3 +279,5 @@ class MOEModel(pl.LightningModule):
         return [optimizer_cnn, optimizer_mlp, optimizer_final], [scheduler_cnn, scheduler_mlp, scheduler_final]
 
         # dual scheduler
+
+    # mlflow https://d585504d-4e5f-4236-9b90-8213c9b53792.notebook.gra.ai.cloud.ovh.net/proxy/5001/#/experiments/0?searchFilter=&orderByKey=attributes.start_time&orderByAsc=false&startTime=ALL&lifecycleFilter=Active&modelVersionFilter=All+Runs&datasetsFilter=W10%3D
