@@ -12,7 +12,7 @@ The main function is in `src/dlmi/__init__.py`
 
 ## Use
 
-- Start mlflow: run the command `mlflow_run`
+- Start mlflow: run the command `mlflow_run` (you can access the web app at `http://localhost:5001/`)
 - Launch the program (training+inference on test): `dlmi_train`
     - You can specify the config file `dlmi_train --config-name [train_mlp,train_moe]`: some examples are in `src/dlmi/conf`
 
