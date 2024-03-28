@@ -158,8 +158,7 @@ class MOEModel(pl.LightningModule):
             exit()
 
         pred_final = self.final_classifier(torch.cat([pred_cnn.clone().detach(), pred_mlp.clone().detach()], dim=1).float())
-        pred_final = pred_cnn
-
+        
         return pred_cnn, pred_mlp, pred_final
 
     def validation_step(self, batch, batch_idx):      
