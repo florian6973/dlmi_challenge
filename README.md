@@ -1,6 +1,6 @@
 # Challenge DLMI 2024
 
-Code for the contribution of Diffused Burgers to the Kaggle challenge *Classification of lymphocytosis from white blood cells*.
+Code for the contribution of Diffused Burgers to the Kaggle challenge *Classification of lymphocytosis from white blood cells* (see https://www.kaggle.com/competitions/dlmi-lymphocytosis-classification).
 
 ## Installation
 
