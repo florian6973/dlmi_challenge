@@ -17,8 +17,8 @@ class MOEModel(pl.LightningModule):
         
         self.cfg = cfg
 
-        # self.cnn = torchvision.models.resnet34(weights="DEFAULT")
-        self.cnn = torchvision.models.vit_b_16(weights="DEFAULT")
+        self.cnn = torchvision.models.resnet34(weights="DEFAULT")
+        # self.cnn = torchvision.models.vit_b_16(weights="DEFAULT")
 
         if cfg.get('train', {}).get('freeze_cnn', False):
             for param in self.cnn.parameters():
@@ -130,25 +130,25 @@ class MOEModel(pl.LightningModule):
             print(pred_mlp)
             exit()
 
-        means = []
+        aggreg = []
 
         last_label = 0
-        i_means = 0
+        i_aggreg = 0
         idx_pred_cnn = 0
         # replace this with RNN? that can learn an arbitrary number of vectors
         for i in range(indices.shape[0]):
             current_label = indices[i]
             if current_label - last_label > 1:
                 diff = current_label - last_label
-                means.append(torch.mean(pred_cnn[idx_pred_cnn:idx_pred_cnn+diff], dim=0))
-                i_means += 1
+                aggreg.append(torch.mean(pred_cnn[idx_pred_cnn:idx_pred_cnn+diff], dim=0))
+                i_aggreg += 1
                 idx_pred_cnn += diff
 
             last_label = current_label
 
-        means = torch.stack(means)
+        aggreg = torch.stack(aggreg)
 
-        pred_cnn = means.to(device=cnn_features.device, dtype=cnn_features.dtype)
+        pred_cnn = aggreg.to(device=cnn_features.device, dtype=cnn_features.dtype)
 
         if torch.isnan(pred_cnn).any():
             print("Nan in pred_cnn")
