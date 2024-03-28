@@ -143,7 +143,7 @@ class MOEModel(pl.LightningModule):
         mask[indices] = False
         cnn_features = cnn_features[mask]
 
-        if augment:
+        if self.cfg.get('train', {}).get('augment', False):
             cnn_features = self.transform(cnn_features)
 
         pred_cnn, pred_mlp = self(cnn_features, mlp_features)

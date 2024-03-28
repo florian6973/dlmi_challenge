@@ -26,6 +26,7 @@ exp:
   tune:
     enabled: true
     num_samples: 2
+  augment: true
 
 # mlflow parameters
 mlflow:
