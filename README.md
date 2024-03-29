@@ -31,4 +31,4 @@ See [report](https://drive.google.com/file/d/1Py9MJRk1SyLpuP1XCRs0VfEvc12U9U5w/v
 ## Troubleshooting
 
 - `MiniDataset` has not been updated to the latest version of the code (with Stratified K-Fold). Please use only `MILDataset` in the configs.
-- `ResNet`` is the default backbone in the code. Switching to `ViT` can be done by uncommenting code in `src/dlmi/models/moe_model.py`. `ViT` was more computationnally-intensive and did not provide better results, hence our choice.
+- `ResNet` is the default backbone in the code. Switching to `ViT` can be done by uncommenting code in `src/dlmi/models/moe_model.py`. `ViT` was more computationnally-intensive and did not provide better results, hence our choice.
