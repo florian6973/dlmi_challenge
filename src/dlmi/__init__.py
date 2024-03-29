@@ -54,7 +54,6 @@ def launch(cfg: DictConfig):
     elif cfg.dataset_type == "MILDataset":
         complete_train_set = MILDataset(train_set_path, device)
         print("Train set loaded")
-        # train_set, val_set, mask_train = load_dataset(complete_train_set)
         sets = load_kfolds(complete_train_set)
     else:
         raise ValueError("Dataset type not supported, must be MiniDataset or MILDataset")
@@ -168,7 +167,7 @@ def train_dlmi(config, cfg, complete_train_set, train_set, val_set):
         )
         trainer.fit(model, train_dataset, val_dataset)
 
-        # model.load_state_dict(torch.load(checkpoint_callback.best_model_path)["state_dict"])
+        model.load_state_dict(torch.load(checkpoint_callback.best_model_path)["state_dict"])
 
     if config is None:
         return model

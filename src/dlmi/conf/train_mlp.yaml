@@ -13,8 +13,8 @@ dataset_type: "MILDataset"
 # Training parameters
 train: 
   lr: 1e-2
-  batch_size : 5 #300 #2 #30
-  num_epochs: 20 #40
+  batch_size : 5
+  num_epochs: 20
   weight_decay: 0
 
 # Experiment parameters
@@ -23,10 +23,10 @@ exp:
   data_path: "/data/raw/" 
   checkpoint: "models/linear"
   seed: 10
-  tune:
+  tune:  # Hyperparameter tuning
     enabled: false
     num_samples: 2
-  augment: true
+  augment: true  # Data augmentation
 
 # mlflow parameters
 mlflow:

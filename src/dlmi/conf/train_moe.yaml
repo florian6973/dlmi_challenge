@@ -15,9 +15,9 @@ train:
   lr_cnn: 1e-3
   lr_mlp: 1e-2
   lr_final: 1e-2
-  batch_size : 3 #10
-  num_epochs: 20
-  weight_decay: 0 #0.0005
+  batch_size : 5
+  num_epochs: 50
+  weight_decay: 0
   beta1: 0.9
   beta2: 0.999
   freeze_cnn: True
@@ -27,8 +27,8 @@ exp:
   name: "Classification"
   data_path: "/data/raw/" 
   checkpoint: "models/linear"
-  seed: 10 # 15 0.82 #29 0.92
-  tune:
+  seed: 10
+  tune:  # Hyperparameter tuning
     enabled: false
     num_samples: 20
 

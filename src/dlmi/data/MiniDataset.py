@@ -12,6 +12,11 @@ import random
 
 from tqdm import tqdm
 
+"""
+Deprecated class.
+Handle images of patients individually (in sub datasets).
+"""
+
 class Sampler():
     def __init__(self, classes, class_per_batch, batch_size):
         self.classes = classes
@@ -163,20 +168,7 @@ class MiniDataset(Dataset, CustomDataset):
             return bac
         else:
             return 0
-
-        # return df
     
     
 if __name__ == "__main__":
     pass
-    # path = r"C:\Users\gaumu\GitHub\dlmi_challenge\data\raw"
-
-    # data = MILDataset(path)
-
-    # img = iter(data).__next__()[0]
-
-    # import matplotlib.pyplot as plt
-
-    
-    # plot_tensor_as_image(img[0])
-    # plot_tensor_as_image(img[1])

@@ -17,16 +17,18 @@ class MOEModel(pl.LightningModule):
         
         self.cfg = cfg
 
-        self.cnn = torchvision.models.resnet34(weights="DEFAULT")
+        # Uncomment this for the vit model and comment the line below
         # self.cnn = torchvision.models.vit_b_16(weights="DEFAULT")
+        self.cnn = torchvision.models.resnet34(weights="DEFAULT")
 
         if cfg.get('train', {}).get('freeze_cnn', False):
             for param in self.cnn.parameters():
                 param.requires_grad = False
 
+        # Uncomment this for the vit model and comment the two lines after
+        # self.cnn.heads.head = nn.Sequential(
+        #     nn.Linear(self.cnn.heads.head.in_features, 512),
         self.cnn.fc = nn.Sequential(
-        #self.cnn.heads.head = nn.Sequential(
-            # nn.Linear(self.cnn.heads.head.in_features, 512),
             nn.Linear(self.cnn.fc.in_features, 512),
             nn.ReLU(),
             nn.Linear(512, 2),
@@ -279,7 +281,3 @@ class MOEModel(pl.LightningModule):
         scheduler_final = StepLR(optimizer_final, step_size=40, gamma=0.75)
 
         return [optimizer_cnn, optimizer_mlp, optimizer_final], [scheduler_cnn, scheduler_mlp, scheduler_final]
-
-        # dual scheduler
-
-    # mlflow https://d585504d-4e5f-4236-9b90-8213c9b53792.notebook.gra.ai.cloud.ovh.net/proxy/5001/#/experiments/0?searchFilter=&orderByKey=attributes.start_time&orderByAsc=false&startTime=ALL&lifecycleFilter=Active&modelVersionFilter=All+Runs&datasetsFilter=W10%3D
