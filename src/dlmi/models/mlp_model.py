@@ -6,6 +6,9 @@ import torch
 import hydra.utils
 
 class MLPModel(pl.LightningModule):
+    """ Simple MLP model for the DLMI challenge
+    It only uses the clinical features to predict the target
+    """
     def __init__(self, cfg):
         super().__init__()
         self.cfg = cfg

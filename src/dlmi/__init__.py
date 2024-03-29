@@ -35,11 +35,13 @@ from tqdm import tqdm
 import random
 
 def run_local_mlflow():
+    """ Run a local mlflow server """
     subprocess.run('mlflow server --host 127.0.0.1 --port 5001'.split())
 
     
 @hydra.main(config_path="dlmi/conf", config_name="train_moe", version_base="1.1")
 def launch(cfg: DictConfig):
+    """ Launch the training of the model, main function """
     set_seed(cfg.exp.seed)
     device = "cuda" if torch.cuda.is_available() else "cpu"    
 
@@ -100,6 +102,7 @@ def launch(cfg: DictConfig):
 
 
 def submit_final():
+    """ merge the predictions of the different folds for the test set by majority voting """
     dfs = []
     for file in glob.glob('submission_test_*.csv'):
         print("Reading file: ", file)
@@ -133,6 +136,7 @@ def update_config(cfg, config):
 
 
 def train_dlmi(config, cfg, complete_train_set, train_set, val_set):
+    """ Train the model """
     metrics = ["val_negacc"]
     tune_callback = TuneReportCheckpointCallback(metrics, on="validation_end")
     if config is not None:
@@ -174,6 +178,7 @@ def train_dlmi(config, cfg, complete_train_set, train_set, val_set):
 
 
 def tune_cfg(cfg, complete_train_set, train_set, val_set):
+    """ Tune the hyperparameters of the model with ray """
     config = {
         "batch_size": tune.choice([1, 5]),
         # "lr": tune.loguniform(1e-4, 1e-1),
@@ -214,6 +219,7 @@ def tune_cfg(cfg, complete_train_set, train_set, val_set):
 
     
 def run_infer(dataset, main_dataset, model, name, device, mask=None, fold=0):
+    """ do inference on the test set """
     preds = []
     model.eval()
     with torch.no_grad():

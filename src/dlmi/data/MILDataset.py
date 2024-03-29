@@ -11,6 +11,9 @@ import os
 import torch.nn as nn
 
 class MILDataset(Dataset, CustomDataset):
+    """MIL dataset.
+    One item in the dataset is a patient with multiple images.
+    """
     def __init__(self, root_dir, device,split="train"):
         if split == "train":
             self.data_dir = os.path.join(root_dir, "trainset")
@@ -25,13 +28,14 @@ class MILDataset(Dataset, CustomDataset):
         self.data = read_data_csv(self.data_dir)
         self.image_paths = glob.glob(self.data_dir + '/**/*.jpg')
 
-        self.data['GENDER'] = self.data['GENDER'].map({'M': 0, 'F': 1}) # 1 nan value
-        self.data.loc[self.data.GENDER.isna(), "GENDER"] = 0.5
+        self.data['GENDER'] = self.data['GENDER'].map({'M': 0, 'F': 1})
+        self.data.loc[self.data.GENDER.isna(), "GENDER"] = 0.5   # 1 nan value in the dataset
         self.data['AGE'] = (pd.to_datetime('2021-01-01') - pd.to_datetime(self.data['DOB'], format='mixed')).dt.days / (100*365) # scaling normalization
         self.data['LYMPH_COUNT'] = self.data['LYMPH_COUNT'].astype(np.float32) / 200 # scaling normalization
 
-
         self.images = {}
+
+        # Uncomment the following lines to preload all images in the memory
         # for path in tqdm(self.image_paths):
         #     self.images[path] = read_image(path).to(self.device)
 
@@ -51,23 +55,26 @@ class MILDataset(Dataset, CustomDataset):
                 self.images[path] = read_image(path).to(self.device)
             patient_images.append(self.images[path])
             
-
         image_features = torch.stack(patient_images)
+
+        # we make sure that there are no more than 300 images per patient
         image_features = image_features[:300]
         
+        # we pad the images with zeros if there are less than 300 images
+        # to get a fixed size tensor for PyTorch
+        # this tensor will be unpad later in the model
         image_features = nn.functional.pad(image_features, (0, 0, 0, 0, 0, 0, 0, 301 - image_features.shape[0]))
 
         return [image_features, clinical_features], label
     
     def get_balanced_mask(self, train_size):
+        """deprecated since we are using load_kfolds"""
         patients_labels = self.data.loc[self.data['ID'].isin(self.patients), 'LABEL']
 
         from sklearn.model_selection import train_test_split
 
         train_patients, _ = train_test_split(self.patients, stratify=patients_labels, train_size=train_size)
         mask = np.array([p in train_patients for p in self.patients])
-
-        # print(np.count_nonzero(mask), np.count_nonzero(~mask))
 
         # check if the mask is balanced
         print(f"Train set balanced: {np.mean(patients_labels[mask])} with {np.count_nonzero(mask)} samples")
@@ -76,9 +83,14 @@ class MILDataset(Dataset, CustomDataset):
         return mask
     
     def get_indices_from_patient_mask(self, mask):
+        """convert a mask of patients to a mask of indices"""
         return np.where(mask)[0]
 
     def get_patient_labels(self, preds, mask=None, dataset="test", fold=0):
+        """
+        Write the predictions to a csv file (function should be renamed)
+        Can be done for the test set or the validation set (for a specific fold)
+        """
         patient_labels = []
         counters = {}
         k = 0
@@ -90,7 +102,6 @@ class MILDataset(Dataset, CustomDataset):
                 counters[patient] = [0, 0]
             counters[patient][preds[k].item()] += 1
             k += 1
-            # patient_labels.append([patient, preds[i].item()])
         import json
         with open(f'counters_{dataset}_{fold}.json', 'w') as f:
             json.dump(counters, f)

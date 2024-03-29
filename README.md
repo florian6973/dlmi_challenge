@@ -26,7 +26,7 @@ Tested on Windows + Nvidia RTX 4080 12GB and Linux + Nvidia V100S 32GB. Training
 
 ### Results
 
-See report.
+See [report](https://drive.google.com/file/d/1Py9MJRk1SyLpuP1XCRs0VfEvc12U9U5w/view) and [leaderboard](https://www.kaggle.com/competitions/dlmi-lymphocytosis-classification).
 
 ## Troubleshooting
 

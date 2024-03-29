@@ -10,6 +10,13 @@ import torchvision.transforms as transforms
 from torch.optim.lr_scheduler import StepLR
 
 class MOEModel(pl.LightningModule):
+    """
+    Model that uses a Mixture of Experts architecture to classify patients.
+    The model is composed of two submodels: a CNN and a MLP.
+    The CNN is used to extract features from all the images of the patient, then the features are aggregated into a single tensor using a simple mean operation.
+    The MLP is used to extract features from the clinical data.
+    The final classification is done by a linear layer that combines the features (predictions) extracted by the CNN and the MLP.
+    """
     def __init__(self, cfg):
         super().__init__()
 
@@ -115,6 +122,8 @@ class MOEModel(pl.LightningModule):
 
     def infer(self, cnn_features, mlp_features, batch_size, augment=False):
         cnn_features = cnn_features.view(-1, cnn_features.shape[-3], cnn_features.shape[-2], cnn_features.shape[-1])
+
+        # we unpad the images to remove the zeros added in the dataloader for fixed size tensors
         indices = torch.where(torch.sum(cnn_features, dim=(1, 2, 3)).long() == 0)[0]
         mask = torch.ones(cnn_features.shape[0], dtype=torch.bool)
         mask[indices] = False
@@ -134,12 +143,13 @@ class MOEModel(pl.LightningModule):
             print(pred_mlp)
             exit()
 
+        # we aggregate the predictions of the CNN model by PATIENT
+        # the batch can contain multiple patients indeed
+        # split is done by detecting the jumps in the indices between patients in the full batch tensor (because each patient has fewer than 300 images)
         aggreg = []
-
         last_label = 0
         i_aggreg = 0
         idx_pred_cnn = 0
-        # replace this with RNN? that can learn an arbitrary number of vectors
         for i in range(indices.shape[0]):
             current_label = indices[i]
             if current_label - last_label > 1:
@@ -257,7 +267,7 @@ class MOEModel(pl.LightningModule):
         optimizer_total.step()
 
     def configure_optimizers(self):
-        from itertools import chain
+        # from itertools import chain
         optimizer_cnn = hydra.utils.instantiate(
             self.cfg.optimizer,
             *[self.cnn.parameters()],
